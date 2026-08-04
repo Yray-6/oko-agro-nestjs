@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: oko-agro-api
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"

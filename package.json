@@ -5,6 +5,9 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "npx nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -45,6 +48,8 @@
     "class-validator": "^0.14.2",
     "cloudinary": "^2.7.0",
     "decimal.js": "^10.6.0",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
     "nodemailer": "^7.0.6",
     "otp-generator": "^4.0.1",
     "passport": "^0.7.0",
