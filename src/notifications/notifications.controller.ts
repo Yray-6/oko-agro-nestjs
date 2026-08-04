@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
 import { 
@@ -14,6 +14,7 @@ import { ContactBuyerDto } from './dtos/contact-buyer.dto';
 import { Roles } from 'src/auth/decorators/roles.decorators';
 import { RolesGuard } from 'src/auth/guards/roles-guard';
 
+@ApiTags('notifications')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('notifications')
@@ -35,6 +36,7 @@ export class NotificationsController {
 
     @Put(':id')
     @ApiOperation({ summary: 'Get notification by ID',  description: 'Retrieve a notification by ID. Notification must belong to the authenticated user.' })
+    @ApiParam({ name: 'id', description: 'Notification ID', example: 'uuid' })
     @ApiResponse({
         status: 200, description: 'Notification retrieved successfully',
         type: GetNotificationResponseDto
@@ -46,6 +48,7 @@ export class NotificationsController {
 
     @Put('read/:id')
     @ApiOperation({ summary: 'Mark a notification as read',  description: 'Marks a single notification as read for the authenticated user' })
+    @ApiParam({ name: 'id', description: 'Notification ID', example: 'uuid' })
     @ApiResponse({
         status: 200, description: 'Notification marked as read',
         type: MarkAsReadResponseDto

@@ -7,10 +7,11 @@ import { User, UserRole } from 'src/users/entities/user.entity';
 import { RolesGuard } from 'src/auth/guards/roles-guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { UpdateEventDto } from './dtos/update-event.dto';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { EventCreateResponseDto, EventDeleteResponseDto, EventFindResponseDto, EventUpdateResponseDto, EventUserListResponseDto, GetEventsResponseDto } from './dtos/response.dto';
 import { GetEventsQueryDto } from './dtos/get-events-query.dto';
 
+@ApiTags('events')
 @ApiBearerAuth()
 @Controller('events')
 @UseGuards(JwtAuthGuard)
@@ -48,6 +49,7 @@ export class EventsController {
     }
 
     @ApiOperation({ summary: 'Fetch event with :eventId' })
+    @ApiParam({ name: 'eventId', description: 'Event ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: "Successfully fetched event", type: EventFindResponseDto })
     @Get(':eventId')
     @HttpCode(HttpStatus.OK)
@@ -56,6 +58,7 @@ export class EventsController {
     }
 
     @ApiOperation({ summary: `Fetch a user's list of events with :userId` })
+    @ApiParam({ name: 'userId', description: 'User ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: "Successfully fetched user's events", type: EventUserListResponseDto })
     @Get('user/:userId')
     @HttpCode(HttpStatus.OK)
@@ -64,6 +67,7 @@ export class EventsController {
     }
 
     @ApiOperation({ summary: `Delete event (Only the owner can deleted)` })
+    @ApiParam({ name: 'eventId', description: 'Event ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: "Successfully deleted event", type: EventDeleteResponseDto })
     @Delete(':eventId')
     @HttpCode(HttpStatus.OK)

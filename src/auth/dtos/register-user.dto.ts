@@ -88,6 +88,7 @@ export class RegisterUserDto {
     @IsOptional()
     yearEstablished?: string;
 
+    @ApiProperty({ enum: BusinessType, example: BusinessType.FOODPROCESSING, description: 'Provide user businessType' })
     @IsEnum(BusinessType)
     @IsOptional()
     businessType?: BusinessType;

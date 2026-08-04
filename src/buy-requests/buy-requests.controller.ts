@@ -9,7 +9,7 @@ import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { UpdateBuyRequestDto } from './dtos/update-buy-request.dto';
 import { UpdateBuyRequestStatusDto } from './dtos/update-buy-request-status.dto';
 import { BuyRequestStatus } from './entities/buy-request.entity';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { 
     BuyRequestCreateResponseDto, BuyRequestDeleteResponseDto, 
     BuyRequestGeneralListResponseDto, BuyRequestListResponseDto, 
@@ -25,6 +25,7 @@ import { UpdatePurchaseOrderDocDto } from './dtos/update-purchase-order-doc.dto'
 import { DirectBuyRequestDto } from './dtos/direct-buy-request.dto';
 import { GetAllBuyRequestsQueryDto } from './dtos/get-all-buy-requests.query.dto';
 
+@ApiTags('buy-requests')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('buy-requests')
@@ -132,6 +133,7 @@ export class BuyRequestsController {
     }
 
     @ApiOperation({ summary: 'Fetch buyRequest with :buyRequestId' })
+    @ApiParam({ name: 'buyRequestId', description: 'Buy request ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: "Successfully fetched buyRequest", type: BuyRequestFindResponseDto })
     @Get(':buyRequestId')
     @HttpCode(HttpStatus.OK)
@@ -140,6 +142,7 @@ export class BuyRequestsController {
     }
 
     @ApiOperation({ summary: `Fetch a user's list buyRequests with :userId` })
+    @ApiParam({ name: 'userId', description: 'User ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: "Successfully fetched user's buyRequests", type: BuyRequestFindByUserIdResponseDto })
     @Get('user/:userId')
     @Roles(UserRole.PROCESSOR, UserRole.FARMER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
@@ -151,6 +154,7 @@ export class BuyRequestsController {
 
     @Put('direct/:buyRequestId')
     @ApiOperation({ summary: 'Direct a general buy request to a preferred seller'})
+    @ApiParam({ name: 'buyRequestId', description: 'Buy request ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: 'Buy request directed successfully', type: DirectBuyRequestResponseDto })
     @Roles(UserRole.PROCESSOR)
     @UseGuards(RolesGuard)
@@ -172,6 +176,7 @@ export class BuyRequestsController {
     }
 
     @ApiOperation({ summary: 'Delete a purchase order doc (only the ower)' })
+    @ApiParam({ name: 'documentId', description: 'Purchase order document ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: "Successfully deleted purchase order doc", type: PurchaseOrderDeleteResponseDto })
     @Delete('remove-purchase-order/:documentId')
     @Roles(UserRole.PROCESSOR)
@@ -183,6 +188,7 @@ export class BuyRequestsController {
 
     // 🔹 Delete a request (soft delete, processors only)
     @ApiOperation({ summary: 'Delete a request (processors only)' })
+    @ApiParam({ name: 'buyRequestId', description: 'Buy request ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: "Successfully deleted buy request", type: BuyRequestDeleteResponseDto })
     @Delete(':buyRequestId')
     @Roles(UserRole.PROCESSOR)

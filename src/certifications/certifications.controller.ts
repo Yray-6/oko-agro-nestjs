@@ -6,14 +6,17 @@ import { RolesGuard } from 'src/auth/guards/roles-guard';
 import { CertificationsService } from './certifications.service';
 import { Certification } from './entities/certification.entity';
 import { CreateCertificationDto } from './dtos/create-certification.dto';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('certifications')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard,RolesGuard)
 @Controller('certifications')
 export class CertificationsController {
     constructor(private readonly certificationsService: CertificationsService) {}
 
+    @ApiOperation({ summary: 'Create a new certification (admin only)' })
+    @ApiResponse({ status: 201, description: 'Certification created successfully', type: Certification })
     @Post('create')
     @Roles(UserRole.ADMIN,UserRole.SUPER_ADMIN)
     @HttpCode(HttpStatus.CREATED)
@@ -21,6 +24,8 @@ export class CertificationsController {
         return this.certificationsService.create(createCertificationDto);
     }
 
+    @ApiOperation({ summary: 'List all certifications' })
+    @ApiResponse({ status: 200, description: 'Certifications fetched successfully', type: Certification, isArray: true })
     @Get()
     @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.FARMER, UserRole.PROCESSOR)
     @HttpCode(HttpStatus.OK)

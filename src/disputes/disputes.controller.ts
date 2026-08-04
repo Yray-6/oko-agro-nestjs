@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { DisputesService } from './disputes.service';
 import { RolesGuard } from 'src/auth/guards/roles-guard';
@@ -13,6 +13,7 @@ import {
     RejectDisputeResponseDto, ResolveDisputeResponseDto 
 } from './dtos/response.dto';
 
+@ApiTags('disputes')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('disputes')
@@ -37,6 +38,7 @@ export class DisputesController {
 
     @Get(':id')
     @ApiOperation({ summary: 'Get dispute by ID', description: 'Returns a dispute if the requester is an admin or involved in the buy request',})
+    @ApiParam({ name: 'id', description: 'Dispute ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: 'Dispute retrieved successfully', type: GetDisputeResponseDto})
     async getDisputeById( @Param('id', ParseUUIDPipe) disputeId: string, @CurrentUser() currentUser: User,) {
         return await this.disputesService.getDisputeById( disputeId, currentUser,);
@@ -44,6 +46,7 @@ export class DisputesController {
 
     @Patch(':id/resolve')
     @ApiOperation({ summary: 'Resolve a dispute', description: 'Allows admin to resolve an open or under-review dispute',})
+    @ApiParam({ name: 'id', description: 'Dispute ID', example: 'uuid' })
     @ApiResponse({status: 200, description: 'Dispute resolved successfully', type: ResolveDisputeResponseDto})
     @UseGuards(RolesGuard)
     @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
@@ -53,6 +56,7 @@ export class DisputesController {
 
     @Patch(':id/reject')
     @ApiOperation({ summary: 'Reject a dispute', description: 'Allows admin to reject an open or under-review dispute',})
+    @ApiParam({ name: 'id', description: 'Dispute ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: 'Dispute rejected successfully', type: RejectDisputeResponseDto})
     @UseGuards(RolesGuard)
     @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)

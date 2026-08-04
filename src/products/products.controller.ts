@@ -8,14 +8,17 @@ import { Roles } from 'src/auth/decorators/roles.decorators';
 import { RolesGuard } from 'src/auth/guards/roles-guard';
 import { UpdateProductDto } from './dtos/update-product.dto';
 import { UpdateProductPhotosDto } from './dtos/update-product-photos.dto';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UpdateProductApprovalDto } from './dtos/update-product-approval.dto';
 import { 
     ProductApprovalStatusResponseDto, ProductListingsResponseDto,
-    ProductFindByUserIdResponseDto, ProductApprovedFindByUserIdResponseDto
+    ProductFindByUserIdResponseDto, ProductApprovedFindByUserIdResponseDto,
+    ProductCreateResponseDto, ProductUpdateResponseDto, ProductFindResponseDto,
+    ProductDeleteResponseDto, ProductPhotosUploadResponseDto, ProductPhotoDeleteResponseDto,
 } from './dtos/response.dto';
 import { ProductListingQueryDto } from './dtos/product-listing-query.dto';
 
+@ApiTags('products')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('products')
@@ -23,6 +26,7 @@ export class ProductsController {
     constructor(private readonly productsService: ProductsService) {}
     
     @ApiOperation({ summary: 'Create a new product (farmers only)' })
+    @ApiResponse({ status: 201, description: 'Product created successfully', type: ProductCreateResponseDto })
     @Post('create')
     @Roles(UserRole.FARMER)
     @UseGuards(RolesGuard)
@@ -32,6 +36,7 @@ export class ProductsController {
     }
 
     @ApiOperation({ summary: 'Update a product (Only user who created the event can update)' })
+    @ApiResponse({ status: 200, description: 'Product updated successfully', type: ProductUpdateResponseDto })
     @Patch('update')
     @Roles(UserRole.FARMER)
     @UseGuards(RolesGuard)
@@ -41,6 +46,7 @@ export class ProductsController {
     }
 
     @ApiOperation({ summary: `Fetch a user's list of products with :userId (Only owner user and Admin user can access)` })
+    @ApiParam({ name: 'userId', description: 'Owner user ID', example: 'uuid' })
     @ApiResponse({status: 200, description: 'Successfully fetched approved user products', type: ProductFindByUserIdResponseDto})
     @Get('user/:userId')
     @Roles(UserRole.FARMER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
@@ -51,6 +57,7 @@ export class ProductsController {
     }
 
     @ApiOperation({ summary: 'Fetch approved products belonging to a specific user' })
+    @ApiParam({ name: 'userId', description: 'Owner user ID', example: 'uuid' })
     @ApiResponse({status: 200, description: 'Successfully fetched approved user products', type: ProductApprovedFindByUserIdResponseDto})
     @Get('approved/user/:userId')
     @HttpCode(HttpStatus.OK)
@@ -72,6 +79,8 @@ export class ProductsController {
     }
 
     @ApiOperation({ summary: 'Fetch product with :productId' })
+    @ApiParam({ name: 'productId', description: 'Product ID', example: 'uuid' })
+    @ApiResponse({ status: 200, description: 'Product fetched successfully', type: ProductFindResponseDto })
     @Get(':productId')
     @HttpCode(HttpStatus.OK)
     async findProduct(@Param('productId') productId: string) {
@@ -92,6 +101,8 @@ export class ProductsController {
     }
 
     @ApiOperation({ summary: `Delete a product photo (Only the owner)` })
+    @ApiParam({ name: 'photoId', description: 'Product photo ID', example: 'uuid' })
+    @ApiResponse({ status: 200, description: 'Product photo deleted successfully', type: ProductPhotoDeleteResponseDto })
     @Delete('remove-photo/:photoId')
     @Roles(UserRole.FARMER)
     @UseGuards(RolesGuard)
@@ -101,6 +112,7 @@ export class ProductsController {
     }
 
     @ApiOperation({ summary: `Upload photo(s) for a product (Only the owner` })
+    @ApiResponse({ status: 201, description: 'Product photos uploaded successfully', type: ProductPhotosUploadResponseDto })
     @Post('upload-photo')
     @HttpCode(HttpStatus.CREATED)
     async uploadProductPhotos(@Body() dto: UpdateProductPhotosDto) {
@@ -108,6 +120,8 @@ export class ProductsController {
     }
 
     @ApiOperation({ summary: `Delete a product (Only the owner can deleted)` })
+    @ApiParam({ name: 'productId', description: 'Product ID', example: 'uuid' })
+    @ApiResponse({ status: 200, description: 'Product deleted successfully', type: ProductDeleteResponseDto })
     @Delete(':productId')
     @Roles(UserRole.FARMER)
     @UseGuards(RolesGuard)

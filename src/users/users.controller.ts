@@ -2,10 +2,11 @@ import { Controller, DefaultValuePipe, Get, HttpCode, HttpStatus, Param, ParseIn
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FarmerListResponseDto, ProcessorListResponseDto, UserFindResponseDto, AllUsersResponseDto } from './dtos/response.dto';
 import { FindAllUsersQueryDto } from './dtos/find-all-users-query.dto';
 
+@ApiTags('users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('users')
@@ -57,6 +58,7 @@ export class UsersController {
     }
 
     @ApiOperation({ summary: 'Fetch user on the system with :userId' })
+    @ApiParam({ name: 'userId', description: 'User ID', example: 'uuid' })
     @ApiResponse({ status: 200, description: "Successfully fetched user", type: UserFindResponseDto })
     @Get(':userId')
     @HttpCode(HttpStatus.OK)

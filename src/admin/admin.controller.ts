@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from 'src/auth/decorators/roles.decorators';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles-guard';
@@ -18,7 +18,9 @@ import { ProductInventoriesService } from 'src/product-inventories/product-inven
 import { GetInventoriesQueryDto } from 'src/product-inventories/dtos/get-inventories-query.dto';
 import { TopPerformingUsersQueryDto } from './dtos/top-performing-users-query.dto';
 import { TopPerformingRegionsQueryDto } from './dtos/top-performing-regions-query.dto';
+import { GetInventoriesResponseDto, GetProductInventoriesResponseDto } from 'src/product-inventories/dtos/response.dto';
 
+@ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('admin')
@@ -101,7 +103,7 @@ export class AdminController {
             Results are ordered by most recent inventory activity first.
             `,
     })
-    @ApiResponse({ status: 200, description: 'Inventories fetched successfully with pagination metadata.'})
+    @ApiResponse({ status: 200, description: 'Inventories fetched successfully with pagination metadata.', type: GetInventoriesResponseDto })
     @Get('inventories')
     @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
     @UseGuards(RolesGuard)
@@ -112,7 +114,8 @@ export class AdminController {
     }
 
     @ApiOperation({ summary: 'Get all inventory logs of a product' })
-    @ApiResponse({ status: 200, description: "Product inventory logs fetched successfully" })
+    @ApiParam({ name: 'id', description: 'Product ID', example: 'uuid' })
+    @ApiResponse({ status: 200, description: "Product inventory logs fetched successfully", type: GetProductInventoriesResponseDto })
     @Get('inventories/product/:id')
     @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.FARMER)
     @UseGuards(RolesGuard)
@@ -136,6 +139,7 @@ export class AdminController {
     @Delete(':userId')
     @Roles(UserRole.SUPER_ADMIN) // Only super_admin can access
     @ApiOperation({ summary: "Delete an admin user (SUPER ADMIN only)" })
+    @ApiParam({ name: 'userId', description: 'Admin user ID to delete', example: 'uuid' })
     @ApiResponse({ status: 200, description: "Admin deleted", type: DeleteAdminResponseDto})
     async deleteAdmin(@Param('userId') userId: string) {
         return this.adminService.deleteAdmin(userId);

@@ -6,14 +6,17 @@ import { Roles } from 'src/auth/decorators/roles.decorators';
 import { UserRole } from 'src/users/entities/user.entity';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles-guard';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('crops')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard,RolesGuard)
 @Controller('crops')
 export class CropsController {
     constructor(private readonly cropsService: CropsService) {}
 
+    @ApiOperation({ summary: 'Create a new crop (admin only)' })
+    @ApiResponse({ status: 201, description: 'Crop created successfully', type: Crop })
     @Post('create')
     @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
     @HttpCode(HttpStatus.CREATED)
@@ -21,6 +24,8 @@ export class CropsController {
         return this.cropsService.create(createCropDto);
     }
 
+    @ApiOperation({ summary: 'List all crops' })
+    @ApiResponse({ status: 200, description: 'Crops fetched successfully', type: Crop, isArray: true })
     @Get()
     @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.FARMER, UserRole.PROCESSOR)
     @HttpCode(HttpStatus.OK)
