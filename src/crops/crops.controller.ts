@@ -9,25 +9,24 @@ import { RolesGuard } from 'src/auth/guards/roles-guard';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('crops')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard,RolesGuard)
 @Controller('crops')
 export class CropsController {
     constructor(private readonly cropsService: CropsService) {}
 
+    @ApiBearerAuth()
     @ApiOperation({ summary: 'Create a new crop (admin only)' })
     @ApiResponse({ status: 201, description: 'Crop created successfully', type: Crop })
     @Post('create')
+    @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
     @HttpCode(HttpStatus.CREATED)
     async create(@Body() createCropDto: CreateCropDto): Promise<Crop> {
         return this.cropsService.create(createCropDto);
     }
 
-    @ApiOperation({ summary: 'List all crops' })
+    @ApiOperation({ summary: 'List all crops (public)' })
     @ApiResponse({ status: 200, description: 'Crops fetched successfully', type: Crop, isArray: true })
     @Get()
-    @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.FARMER, UserRole.PROCESSOR)
     @HttpCode(HttpStatus.OK)
     async findAll(): Promise<Crop[]> {
         return this.cropsService.findAll();
