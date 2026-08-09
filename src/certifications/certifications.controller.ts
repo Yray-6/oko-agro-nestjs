@@ -9,25 +9,24 @@ import { CreateCertificationDto } from './dtos/create-certification.dto';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('certifications')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard,RolesGuard)
 @Controller('certifications')
 export class CertificationsController {
     constructor(private readonly certificationsService: CertificationsService) {}
 
+    @ApiBearerAuth()
     @ApiOperation({ summary: 'Create a new certification (admin only)' })
     @ApiResponse({ status: 201, description: 'Certification created successfully', type: Certification })
     @Post('create')
-    @Roles(UserRole.ADMIN,UserRole.SUPER_ADMIN)
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
     @HttpCode(HttpStatus.CREATED)
     async create(@Body() createCertificationDto: CreateCertificationDto): Promise<Certification> {
         return this.certificationsService.create(createCertificationDto);
     }
 
-    @ApiOperation({ summary: 'List all certifications' })
+    @ApiOperation({ summary: 'List all certifications (public)' })
     @ApiResponse({ status: 200, description: 'Certifications fetched successfully', type: Certification, isArray: true })
     @Get()
-    @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.FARMER, UserRole.PROCESSOR)
     @HttpCode(HttpStatus.OK)
     async findAll(): Promise<Certification[]> {
         return this.certificationsService.findAll();
