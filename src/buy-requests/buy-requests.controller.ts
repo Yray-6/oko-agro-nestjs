@@ -16,10 +16,12 @@ import {
     BuyRequestUpdateResponseDto, BuyRequestUpdateStatusResponseDto,
     BuyRequestFindResponseDto, BuyRequestFindByUserIdResponseDto,
     BuyRequestUpdateOrderStateResponseDto,BuyRequestOngoingOrderListResponseDto,
+    BuyRequestUpdateTrackingResponseDto,
     PurchaseOrderDeleteResponseDto, DirectBuyRequestResponseDto,
     GetAllBuyRequestsResponseDto
 } from './dtos/response.dto';
 import { UpdateOrderStateDto } from './dtos/update-order-state.dto';
+import { UpdateTrackingDto } from './dtos/update-tracking.dto';
 import { OngoingBuyRequestOrdersQueryDto } from './dtos/ongoing-buy-request-orders-query.dto';
 import { UpdatePurchaseOrderDocDto } from './dtos/update-purchase-order-doc.dto';
 import { DirectBuyRequestDto } from './dtos/direct-buy-request.dto';
@@ -82,6 +84,18 @@ export class BuyRequestsController {
     @HttpCode(HttpStatus.OK)
     async updateOrderState( @Body() dto: UpdateOrderStateDto, @CurrentUser() currentUser: User,) {
         return this.buyRequestsService.updateOrderState(dto, currentUser);
+    }
+
+    // 🔹 Link AgroTrack tracking (does not change orderState / payment)
+    @ApiOperation({
+        summary: 'Link AgroTrack tracking number to a BuyRequest',
+        description: 'Seller (farmer), buyer (processor), or admin. Does not change orderState or paymentConfirmed.',
+    })
+    @ApiResponse({ status: 200, description: 'Tracking linked successfully', type: BuyRequestUpdateTrackingResponseDto })
+    @Put('update-tracking')
+    @HttpCode(HttpStatus.OK)
+    async updateTracking(@Body() dto: UpdateTrackingDto, @CurrentUser() currentUser: User) {
+        return this.buyRequestsService.updateTracking(dto, currentUser);
     }
 
     // 🔹 Fetch all general requests (visible to farmers, returning pending requests - not older than 1 week)

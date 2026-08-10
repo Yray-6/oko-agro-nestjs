@@ -13,6 +13,7 @@ import { instanceToPlain } from 'class-transformer';
 import { UpdateBuyRequestStatusDto } from './dtos/update-buy-request-status.dto';
 import { UpdateBuyRequestDto } from './dtos/update-buy-request.dto';
 import { UpdateOrderStateDto } from './dtos/update-order-state.dto';
+import { UpdateTrackingDto } from './dtos/update-tracking.dto';
 import { OngoingBuyRequestOrdersQueryDto } from './dtos/ongoing-buy-request-orders-query.dto';
 import { detectMimeTypeFromBase64, isValidBase64SizeGeneric, PO_SUPPORTED_MIME_TYPES, SUPPORTED_MIME_TYPES } from 'src/common/utils/base64.util';
 import { PurchaseOrderDocFilesService } from 'src/purchase-order-doc-files/purchase-order-doc-files.service';
@@ -477,6 +478,55 @@ export class BuyRequestsService {
             };
         } catch (error) {
             handleServiceError(error, 'An error occurred while updating order state');
+        }
+    }
+
+    /**
+     * Link an AgroTrack tracking number to a buy request.
+     * Does not change orderState or paymentConfirmed (Phase 2).
+     */
+    async updateTracking(dto: UpdateTrackingDto, currentUser: User): Promise<any> {
+        try {
+            const buyRequest = await this.buyRequestsRepository.findOne({
+                where: { id: dto.buyRequestId, isDeleted: false },
+                relations: ['buyer', 'seller', 'cropType', 'qualityStandardType', 'product'],
+            });
+
+            if (!buyRequest) {
+                throw new NotFoundException('BuyRequest not found');
+            }
+
+            const isAdmin =
+                currentUser.role === UserRole.ADMIN ||
+                currentUser.role === UserRole.SUPER_ADMIN;
+            const isBuyer = currentUser.id === buyRequest.buyer?.id;
+            const isSeller = currentUser.id === buyRequest.seller?.id;
+
+            if (!isAdmin && !isBuyer && !isSeller) {
+                throw new ForbiddenException(
+                    'You are not authorized to link tracking for this request',
+                );
+            }
+
+            const tracking = dto.agroTrackTrackingNumber
+                .trim()
+                .replace(/^#/, '')
+                .toUpperCase();
+
+            if (!tracking) {
+                throw new BadRequestException('agroTrackTrackingNumber is required');
+            }
+
+            buyRequest.agroTrackTrackingNumber = tracking;
+            const updated = await this.buyRequestsRepository.save(buyRequest);
+
+            return {
+                statusCode: 200,
+                message: 'AgroTrack tracking number linked successfully',
+                data: instanceToPlain(updated),
+            };
+        } catch (error) {
+            handleServiceError(error, 'An error occurred while linking AgroTrack tracking');
         }
     }
 

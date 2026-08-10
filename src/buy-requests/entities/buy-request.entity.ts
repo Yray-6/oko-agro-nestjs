@@ -130,7 +130,11 @@ export class BuyRequest {
   paymentConfirmed: boolean; 
 
   @Column({ type: 'timestamptz', nullable: true })
-  paymentConfirmedAt: Date | null;  
+  paymentConfirmedAt: Date | null;
+
+  /** AgroTrack tracking number linked from Phase 2 handoff (optional). */
+  @Column({ type: 'varchar', nullable: true })
+  agroTrackTrackingNumber: string | null;
 
   @Column({ type: 'boolean', default: false })
   isDeleted: boolean;
