@@ -13,6 +13,7 @@ import { PurchaseOrderDocFilesModule } from 'src/purchase-order-doc-files/purcha
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { ProductInventoriesModule } from 'src/product-inventories/product-inventories.module';
 import { User } from 'src/users/entities/user.entity';
+import { AgroTrackClientModule } from 'src/integrations/agrotrack/agrotrack-client.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { User } from 'src/users/entities/user.entity';
     AuthModule,
     UsersModule,
     NotificationsModule,
-    ProductInventoriesModule
+    ProductInventoriesModule,
+    AgroTrackClientModule
   ],
   providers: [BuyRequestsService],
   controllers: [BuyRequestsController]

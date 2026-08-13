@@ -23,17 +23,18 @@ import { DisputesModule } from './disputes/disputes.module';
 import { RatingsModule } from './ratings/ratings.module';
 import { SmsModule } from './sms/sms.module';
 import { ProductInventoriesModule } from './product-inventories/product-inventories.module';
+import { AgroTrackClientModule } from './integrations/agrotrack/agrotrack-client.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }), // Makes ConfigService available everywhere
     TypeOrmModule.forRoot(ormconfig),
-    UsersModule, AuthModule, CropsModule, FilesModule, MailerModule, 
-    CertificationsModule, QualityStandardsModule, ProductsModule, 
-    FarmerProductPhotoFilesModule, EventsModule, BuyRequestsModule, 
-    SchedulersModule, AdminModule, PurchaseOrderDocFilesModule, 
-    PurchaseOrderDocFilesModule, NotificationsModule, DisputesModule, 
-    RatingsModule, SmsModule, ProductInventoriesModule
+    UsersModule, AuthModule, CropsModule, FilesModule, MailerModule,
+    CertificationsModule, QualityStandardsModule, ProductsModule,
+    FarmerProductPhotoFilesModule, EventsModule, BuyRequestsModule,
+    SchedulersModule, AdminModule, PurchaseOrderDocFilesModule,
+    PurchaseOrderDocFilesModule, NotificationsModule, DisputesModule,
+    RatingsModule, SmsModule, ProductInventoriesModule, AgroTrackClientModule
   ],
   controllers: [AppController],
   providers: [AppService],

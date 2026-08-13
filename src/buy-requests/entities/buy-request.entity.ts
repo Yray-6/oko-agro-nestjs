@@ -44,6 +44,19 @@ export enum OrderState {
   COMPLETED = 'completed',
 }
 
+// AgroTrack's own status vocabulary — deliberately not merged with OrderState.
+// AgroTrack's "in_transit" is not the same event as Oko's (which also gates
+// paymentConfirmed); this enum exists so the two never get conflated.
+export enum AgroTrackStatus {
+  NEW_REQUEST = 'new_request',
+  ASSIGNED = 'assigned',
+  PENDING_PICKUP = 'pending_pickup',
+  IN_TRANSIT = 'in_transit',
+  DELIVERED = 'delivered',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
+}
+
 
 @Entity('buy_requests')
 export class BuyRequest {
@@ -135,6 +148,22 @@ export class BuyRequest {
   /** AgroTrack tracking number linked from Phase 2 handoff (optional). */
   @Column({ type: 'varchar', nullable: true })
   agroTrackTrackingNumber: string | null;
+
+  /** AgroTrack's internal order id — needed for reconciliation calls, not just display. */
+  @Column({ type: 'int', nullable: true })
+  agroTrackOrderId: number | null;
+
+  /**
+   * Mirrors AgroTrack's shipment status via webhook/reconciliation.
+   * Deliberately separate from paymentConfirmed — logistics status must
+   * never drive payment state on its own.
+   */
+  @Column({ type: 'enum', enum: AgroTrackStatus, nullable: true })
+  agroTrackStatus: AgroTrackStatus | null;
+
+  /** Last successful webhook or reconciliation timestamp — drives staleness alerts. */
+  @Column({ type: 'timestamptz', nullable: true })
+  agroTrackSyncedAt: Date | null;
 
   @Column({ type: 'boolean', default: false })
   isDeleted: boolean;

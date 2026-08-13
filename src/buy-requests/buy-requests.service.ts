@@ -1,7 +1,7 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, MoreThan, Repository } from 'typeorm';
-import { BuyRequest, BuyRequestStatus, OrderState } from './entities/buy-request.entity';
+import { BuyRequest, BuyRequestStatus, OrderState, AgroTrackStatus } from './entities/buy-request.entity';
 import { Crop } from 'src/crops/entities/crop.entity';
 import { QualityStandard } from 'src/quality-standards/entities/quality-standard.entity';
 import { Product } from 'src/products/entities/product.entity';
@@ -25,6 +25,12 @@ import { GetAllBuyRequestsQueryDto } from './dtos/get-all-buy-requests.query.dto
 import { ProductInventoriesService } from 'src/product-inventories/product-inventories.service';
 import Decimal from 'decimal.js';
 import { ProductInventory, ProductInventoryType } from 'src/product-inventories/entities/product-inventory.entity';
+import { ArrangeTransitDto } from './dtos/arrange-transit.dto';
+import {
+    AgroTrackCancellationRejectedError,
+    AgroTrackIntegrationService,
+    AgroTrackSenderUnresolvedError,
+} from 'src/integrations/agrotrack/agrotrack-integration.service';
 
 @Injectable()
 export class BuyRequestsService {
@@ -39,8 +45,9 @@ export class BuyRequestsService {
         private readonly usersService: UsersService,
         private readonly fileService: PurchaseOrderDocFilesService,
         private readonly notificationsService: NotificationsService,
-        private readonly productInventoriesService: ProductInventoriesService,  
+        private readonly productInventoriesService: ProductInventoriesService,
         private readonly dataSource: DataSource,
+        private readonly agroTrackIntegration: AgroTrackIntegrationService,
     ) {}
 
     
@@ -527,6 +534,156 @@ export class BuyRequestsService {
             };
         } catch (error) {
             handleServiceError(error, 'An error occurred while linking AgroTrack tracking');
+        }
+    }
+
+    /**
+     * One-click "Arrange transit": creates the shipment on AgroTrack server-to-server
+     * and stores the resulting tracking number/order id. Only the farmer (seller) on
+     * the request — or an admin — can trigger this.
+     *
+     * Deliberately does not touch orderState or paymentConfirmed — logistics status
+     * from AgroTrack must never drive payment state (see the Phase 3 integration plan).
+     */
+    async arrangeTransitViaAgroTrack(id: string, dto: ArrangeTransitDto, currentUser: User): Promise<any> {
+        try {
+            const buyRequest = await this.buyRequestsRepository.findOne({
+                where: { id, isDeleted: false },
+                relations: ['buyer', 'seller'],
+            });
+
+            if (!buyRequest) {
+                throw new NotFoundException('BuyRequest not found');
+            }
+
+            const isAdmin =
+                currentUser.role === UserRole.ADMIN ||
+                currentUser.role === UserRole.SUPER_ADMIN;
+            const isSeller = currentUser.id === buyRequest.seller?.id;
+
+            if (!isAdmin && !isSeller) {
+                throw new ForbiddenException('Only the farmer on this request can arrange transit');
+            }
+
+            if (!buyRequest.seller) {
+                throw new BadRequestException('This buy request has no farmer/seller assigned yet');
+            }
+
+            if (buyRequest.agroTrackTrackingNumber) {
+                return {
+                    statusCode: 200,
+                    message: 'A shipment has already been arranged for this request',
+                    data: instanceToPlain(buyRequest),
+                };
+            }
+
+            const farmer = buyRequest.seller;
+            const fullName = `${farmer.firstName ?? ''} ${farmer.lastName ?? ''}`.trim();
+
+            let result;
+            try {
+                result = await this.agroTrackIntegration.createOrder({
+                    oko_request_id: buyRequest.id,
+                    oko_request_number: String(buyRequest.requestNumber),
+                    oko_user_id: farmer.id,
+                    oko_user_email: farmer.email,
+                    oko_user_full_name: fullName,
+                    oko_user_phone: farmer.phoneNumber,
+                    oko_consent_ack: Boolean(dto.consentAcknowledged),
+                    pickup_state: dto.pickupState,
+                    pickup_lga: dto.pickupLga,
+                    pickup_street_address: dto.pickupStreetAddress,
+                    pickup_contact_name: dto.pickupContactName,
+                    pickup_phone: dto.pickupPhone,
+                    delivery_state: dto.deliveryState,
+                    delivery_lga: dto.deliveryLga,
+                    delivery_street_address: dto.deliveryStreetAddress,
+                    delivery_name: dto.deliveryName,
+                    delivery_phone: dto.deliveryPhone,
+                    delivery_email: dto.deliveryEmail,
+                    cargo_type: dto.cargoType,
+                    cargo_weight: dto.cargoWeight,
+                    cargo_value: dto.cargoValue,
+                    cargo_priority: dto.cargoPriority ?? 'standard',
+                });
+            } catch (err) {
+                if (err instanceof AgroTrackSenderUnresolvedError) {
+                    this.logger.warn(`AgroTrack sender unresolved for buyRequest ${buyRequest.id}: ${err.message}`);
+                    return {
+                        statusCode: 200,
+                        message: 'Could not arrange automatically — use the manual Arrange Transit flow',
+                        data: instanceToPlain(buyRequest),
+                        requiresManualFallback: true,
+                    };
+                }
+                throw err;
+            }
+
+            buyRequest.agroTrackTrackingNumber = result.trackingNumber;
+            buyRequest.agroTrackOrderId = result.orderId;
+            const updated = await this.buyRequestsRepository.save(buyRequest);
+
+            return {
+                statusCode: 200,
+                message: 'Shipment arranged with AgroTrack',
+                data: instanceToPlain(updated),
+            };
+        } catch (error) {
+            handleServiceError(error, 'An error occurred while arranging transit with AgroTrack');
+        }
+    }
+
+    /**
+     * Cancels a not-yet-picked-up AgroTrack shipment. Once a driver is en
+     * route, AgroTrack itself rejects this (409) — that's surfaced as a real
+     * ConflictException here, not silently swallowed, since past that point
+     * resolution is a phone call to the dispatcher, not an API call.
+     */
+    async cancelAgroTrackShipment(id: string, currentUser: User): Promise<any> {
+        try {
+            const buyRequest = await this.buyRequestsRepository.findOne({
+                where: { id, isDeleted: false },
+                relations: ['buyer', 'seller'],
+            });
+
+            if (!buyRequest) {
+                throw new NotFoundException('BuyRequest not found');
+            }
+
+            const isAdmin =
+                currentUser.role === UserRole.ADMIN ||
+                currentUser.role === UserRole.SUPER_ADMIN;
+            const isSeller = currentUser.id === buyRequest.seller?.id;
+
+            if (!isAdmin && !isSeller) {
+                throw new ForbiddenException('Only the farmer on this request can cancel its AgroTrack shipment');
+            }
+
+            if (!buyRequest.agroTrackTrackingNumber) {
+                throw new BadRequestException('No AgroTrack shipment is linked to this request');
+            }
+
+            try {
+                await this.agroTrackIntegration.cancelOrder(buyRequest.id);
+            } catch (err) {
+                if (err instanceof AgroTrackCancellationRejectedError) {
+                    throw new ConflictException(err.message);
+                }
+                throw err;
+            }
+
+            // Optimistic — the webhook will confirm this again shortly after,
+            // idempotently. No reason to make the caller wait for it.
+            buyRequest.agroTrackStatus = AgroTrackStatus.CANCELLED;
+            const updated = await this.buyRequestsRepository.save(buyRequest);
+
+            return {
+                statusCode: 200,
+                message: 'AgroTrack shipment cancelled',
+                data: instanceToPlain(updated),
+            };
+        } catch (error) {
+            handleServiceError(error, 'An error occurred while cancelling the AgroTrack shipment');
         }
     }
 

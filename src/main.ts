@@ -6,13 +6,22 @@ import { json, urlencoded } from 'express';
 import {DocumentBuilder, SwaggerModule} from '@nestjs/swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // bodyParser: false — parsing is done explicitly below so the raw bytes
+  // can be captured for webhook signature verification (AgroTrack -> Oko).
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
 
   // ✅ Enable CORS
   app.enableCors({ origin: '*' });
 
-  // Increase payload size limit (e.g., 50MB)
-  app.use(json({ limit: '50mb' }));
+  // Increase payload size limit (e.g., 50MB). The verify callback stashes
+  // the exact raw bytes on the request — AgroTrackWebhookGuard signs/checks
+  // against these, not a re-serialized copy of the parsed body.
+  app.use(json({
+    limit: '50mb',
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   // Enable global validation

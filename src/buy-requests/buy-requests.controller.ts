@@ -17,11 +17,14 @@ import {
     BuyRequestFindResponseDto, BuyRequestFindByUserIdResponseDto,
     BuyRequestUpdateOrderStateResponseDto,BuyRequestOngoingOrderListResponseDto,
     BuyRequestUpdateTrackingResponseDto,
+    BuyRequestArrangeTransitResponseDto,
+    BuyRequestCancelTransitResponseDto,
     PurchaseOrderDeleteResponseDto, DirectBuyRequestResponseDto,
     GetAllBuyRequestsResponseDto
 } from './dtos/response.dto';
 import { UpdateOrderStateDto } from './dtos/update-order-state.dto';
 import { UpdateTrackingDto } from './dtos/update-tracking.dto';
+import { ArrangeTransitDto } from './dtos/arrange-transit.dto';
 import { OngoingBuyRequestOrdersQueryDto } from './dtos/ongoing-buy-request-orders-query.dto';
 import { UpdatePurchaseOrderDocDto } from './dtos/update-purchase-order-doc.dto';
 import { DirectBuyRequestDto } from './dtos/direct-buy-request.dto';
@@ -96,6 +99,29 @@ export class BuyRequestsController {
     @HttpCode(HttpStatus.OK)
     async updateTracking(@Body() dto: UpdateTrackingDto, @CurrentUser() currentUser: User) {
         return this.buyRequestsService.updateTracking(dto, currentUser);
+    }
+
+    // 🔹 One-click arrange transit via AgroTrack (farmer only, their own request)
+    @ApiOperation({ summary: 'Arrange transit for a buy request via AgroTrack (farmer only)' })
+    @ApiResponse({ status: 200, description: 'Shipment arranged with AgroTrack (or requires manual fallback)', type: BuyRequestArrangeTransitResponseDto })
+    @Put(':id/arrange-transit')
+    @HttpCode(HttpStatus.OK)
+    async arrangeTransit(
+        @Param('id') id: string,
+        @Body() dto: ArrangeTransitDto,
+        @CurrentUser() currentUser: User,
+    ) {
+        return this.buyRequestsService.arrangeTransitViaAgroTrack(id, dto, currentUser);
+    }
+
+    // 🔹 Cancel a not-yet-picked-up AgroTrack shipment (farmer only, their own request)
+    @ApiOperation({ summary: 'Cancel an AgroTrack shipment for a buy request (farmer only)' })
+    @ApiResponse({ status: 200, description: 'Shipment cancelled', type: BuyRequestCancelTransitResponseDto })
+    @ApiResponse({ status: 409, description: 'Shipment is already in transit or further along — cancel via the dispatcher instead' })
+    @Put(':id/cancel-transit')
+    @HttpCode(HttpStatus.OK)
+    async cancelTransit(@Param('id') id: string, @CurrentUser() currentUser: User) {
+        return this.buyRequestsService.cancelAgroTrackShipment(id, currentUser);
     }
 
     // 🔹 Fetch all general requests (visible to farmers, returning pending requests - not older than 1 week)

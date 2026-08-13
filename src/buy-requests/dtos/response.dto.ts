@@ -76,6 +76,29 @@ export class BuyRequestUpdateTrackingResponseDto extends ApiResponseDto<BuyReque
     declare data: BuyRequest;
 }
 
+export class BuyRequestArrangeTransitResponseDto extends ApiResponseDto<BuyRequest> {
+    @ApiProperty({ example: 'Shipment arranged with AgroTrack' })
+    declare message: string;
+
+    @ApiProperty({ type: () => BuyRequest })
+    declare data: BuyRequest;
+
+    @ApiProperty({
+        example: false,
+        description: 'True when AgroTrack could not resolve a sender automatically — fall back to the manual Arrange Transit flow.',
+        required: false,
+    })
+    requiresManualFallback?: boolean;
+}
+
+export class BuyRequestCancelTransitResponseDto extends ApiResponseDto<BuyRequest> {
+    @ApiProperty({ example: 'AgroTrack shipment cancelled' })
+    declare message: string;
+
+    @ApiProperty({ type: () => BuyRequest })
+    declare data: BuyRequest;
+}
+
 export class BuyRequestGeneralListResponseDto extends ApiResponseDto<BuyRequest[]> {
     @ApiProperty({ example: 'General buy requests fetched successfully' })
     declare message: string;
