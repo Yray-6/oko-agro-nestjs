@@ -21,7 +21,7 @@ export enum BuyRequestStatus {
   PENDING = 'pending',
   ACCEPTED = 'accepted',
   REJECTED = 'rejected',
-  CANCELLED = 'cancelled', 
+  CANCELLED = 'cancelled',
 }
 
 export enum PaymentMethod {
@@ -57,7 +57,6 @@ export enum AgroTrackStatus {
   CANCELLED = 'cancelled',
 }
 
-
 @Entity('buy_requests')
 export class BuyRequest {
   @PrimaryGeneratedColumn('uuid')
@@ -76,7 +75,7 @@ export class BuyRequest {
   @ManyToOne(() => QualityStandard, { nullable: true })
   qualityStandardType: QualityStandard | null;
 
-   /**
+  /**
    * Requested quantity (normalized to KG)
    */
   @Column({ type: 'decimal', precision: 30, scale: 2 })
@@ -94,10 +93,18 @@ export class BuyRequest {
   @Column({ type: 'varchar' })
   deliveryLocation: string;
 
-  @Column({ type: 'enum', enum: PaymentMethod, default: PaymentMethod.PAY_ON_DELIVERY })
+  @Column({
+    type: 'enum',
+    enum: PaymentMethod,
+    default: PaymentMethod.PAY_ON_DELIVERY,
+  })
   preferredPaymentMethod: PaymentMethod;
 
-  @Column({ type: 'enum', enum: BuyRequestStatus, default: BuyRequestStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: BuyRequestStatus,
+    default: BuyRequestStatus.PENDING,
+  })
   status: BuyRequestStatus;
 
   @Column({ default: false })
@@ -108,8 +115,10 @@ export class BuyRequest {
 
   @ManyToOne(() => User, (user) => user.buyRequestsAsSeller, { nullable: true })
   seller: User | null;
-  
-  @ManyToOne(() => Product, (product) => product.buyRequests, { nullable: true })
+
+  @ManyToOne(() => Product, (product) => product.buyRequests, {
+    nullable: true,
+  })
   product: Product | null;
 
   /**
@@ -118,7 +127,10 @@ export class BuyRequest {
   @OneToMany(() => ProductInventory, (inventory) => inventory.buyRequest)
   inventoryMovements: ProductInventory[];
 
-  @OneToOne( () => PurchaseOrderDocFile, (po) => po.buyRequest, { cascade: true, nullable: true })
+  @OneToOne(() => PurchaseOrderDocFile, (po) => po.buyRequest, {
+    cascade: true,
+    nullable: true,
+  })
   purchaseOrderDoc: PurchaseOrderDocFile | null;
 
   @Column({ type: 'enum', enum: OrderState, nullable: true })
@@ -140,7 +152,7 @@ export class BuyRequest {
   paymentAmount: string | null;
 
   @Column({ type: 'boolean', default: false })
-  paymentConfirmed: boolean; 
+  paymentConfirmed: boolean;
 
   @Column({ type: 'timestamptz', nullable: true })
   paymentConfirmedAt: Date | null;

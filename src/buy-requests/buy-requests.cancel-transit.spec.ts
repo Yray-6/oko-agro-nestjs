@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { BuyRequestsService } from './buy-requests.service';
 import { UserRole } from 'src/users/entities/user.entity';
 import { AgroTrackStatus } from './entities/buy-request.entity';
@@ -18,16 +23,29 @@ describe('BuyRequestsService.cancelAgroTrackShipment', () => {
       cancelOrder: cancelOrderImpl ?? jest.fn().mockResolvedValue(undefined),
     };
     const service = new BuyRequestsService(
-      buyRequestsRepository as any, {} as any, {} as any, {} as any, {} as any,
-      {} as any, {} as any, {} as any, {} as any, {} as any,
+      buyRequestsRepository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
       agroTrackIntegration as any,
     );
     return { service, buyRequestsRepository, agroTrackIntegration };
   };
 
   it('cancels the shipment and marks agroTrackStatus cancelled', async () => {
-    const buyRequest = { id: 'br-1', seller: farmer, agroTrackTrackingNumber: 'AGT30349900' };
-    const { service, buyRequestsRepository, agroTrackIntegration } = buildService(buyRequest);
+    const buyRequest = {
+      id: 'br-1',
+      seller: farmer,
+      agroTrackTrackingNumber: 'AGT30349900',
+    };
+    const { service, buyRequestsRepository, agroTrackIntegration } =
+      buildService(buyRequest);
 
     const result = await service.cancelAgroTrackShipment('br-1', farmer as any);
 
@@ -39,33 +57,59 @@ describe('BuyRequestsService.cancelAgroTrackShipment', () => {
   });
 
   it('surfaces a 409 from AgroTrack as ConflictException, not a silent success', async () => {
-    const buyRequest = { id: 'br-1', seller: farmer, agroTrackTrackingNumber: 'AGT30349900' };
+    const buyRequest = {
+      id: 'br-1',
+      seller: farmer,
+      agroTrackTrackingNumber: 'AGT30349900',
+    };
     const { service, buyRequestsRepository } = buildService(
       buyRequest,
-      jest.fn().mockRejectedValue(new AgroTrackCancellationRejectedError('Already in transit.')),
+      jest
+        .fn()
+        .mockRejectedValue(
+          new AgroTrackCancellationRejectedError('Already in transit.'),
+        ),
     );
 
-    await expect(service.cancelAgroTrackShipment('br-1', farmer as any)).rejects.toThrow(ConflictException);
+    await expect(
+      service.cancelAgroTrackShipment('br-1', farmer as any),
+    ).rejects.toThrow(ConflictException);
     expect(buyRequestsRepository.save).not.toHaveBeenCalled();
   });
 
   it('rejects a request with nothing linked to cancel', async () => {
-    const buyRequest = { id: 'br-1', seller: farmer, agroTrackTrackingNumber: null };
+    const buyRequest = {
+      id: 'br-1',
+      seller: farmer,
+      agroTrackTrackingNumber: null,
+    };
     const { service, agroTrackIntegration } = buildService(buyRequest);
 
-    await expect(service.cancelAgroTrackShipment('br-1', farmer as any)).rejects.toThrow(BadRequestException);
+    await expect(
+      service.cancelAgroTrackShipment('br-1', farmer as any),
+    ).rejects.toThrow(BadRequestException);
     expect(agroTrackIntegration.cancelOrder).not.toHaveBeenCalled();
   });
 
   it('rejects a processor who is not the farmer on this request', async () => {
-    const buyRequest = { id: 'br-1', seller: farmer, agroTrackTrackingNumber: 'AGT30349900' };
+    const buyRequest = {
+      id: 'br-1',
+      seller: farmer,
+      agroTrackTrackingNumber: 'AGT30349900',
+    };
     const { service } = buildService(buyRequest);
 
-    await expect(service.cancelAgroTrackShipment('br-1', processor as any)).rejects.toThrow(ForbiddenException);
+    await expect(
+      service.cancelAgroTrackShipment('br-1', processor as any),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   it('allows an admin to cancel on behalf of the farmer', async () => {
-    const buyRequest = { id: 'br-1', seller: farmer, agroTrackTrackingNumber: 'AGT30349900' };
+    const buyRequest = {
+      id: 'br-1',
+      seller: farmer,
+      agroTrackTrackingNumber: 'AGT30349900',
+    };
     const { service, buyRequestsRepository } = buildService(buyRequest);
 
     await service.cancelAgroTrackShipment('br-1', admin as any);
@@ -75,6 +119,8 @@ describe('BuyRequestsService.cancelAgroTrackShipment', () => {
 
   it('throws NotFoundException for an unknown buy request', async () => {
     const { service } = buildService(null);
-    await expect(service.cancelAgroTrackShipment('missing', farmer as any)).rejects.toThrow(NotFoundException);
+    await expect(
+      service.cancelAgroTrackShipment('missing', farmer as any),
+    ).rejects.toThrow(NotFoundException);
   });
 });

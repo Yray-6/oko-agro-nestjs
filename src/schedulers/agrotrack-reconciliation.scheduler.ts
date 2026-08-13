@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { BuyRequest, AgroTrackStatus } from 'src/buy-requests/entities/buy-request.entity';
+import {
+  BuyRequest,
+  AgroTrackStatus,
+} from 'src/buy-requests/entities/buy-request.entity';
 import { AgroTrackIntegrationService } from 'src/integrations/agrotrack/agrotrack-integration.service';
 
 // The backstop for the outbound webhook mechanism failing systemically —
@@ -17,7 +20,8 @@ export class AgroTrackReconciliationScheduler {
   private readonly logger = new Logger(AgroTrackReconciliationScheduler.name);
 
   constructor(
-    @InjectRepository(BuyRequest) private readonly buyRequestsRepository: Repository<BuyRequest>,
+    @InjectRepository(BuyRequest)
+    private readonly buyRequestsRepository: Repository<BuyRequest>,
     private readonly agroTrackIntegration: AgroTrackIntegrationService,
   ) {}
 
@@ -33,10 +37,16 @@ export class AgroTrackReconciliationScheduler {
     const staleRequests = await this.buyRequestsRepository
       .createQueryBuilder('buyRequest')
       .where('buyRequest.agroTrackTrackingNumber IS NOT NULL')
-      .andWhere('buyRequest.agroTrackStatus IS NULL OR buyRequest.agroTrackStatus NOT IN (:...doneStatuses)', {
-        doneStatuses: [AgroTrackStatus.COMPLETED, AgroTrackStatus.CANCELLED],
-      })
-      .andWhere('(buyRequest.agroTrackSyncedAt IS NULL OR buyRequest.agroTrackSyncedAt < :cutoff)', { cutoff })
+      .andWhere(
+        'buyRequest.agroTrackStatus IS NULL OR buyRequest.agroTrackStatus NOT IN (:...doneStatuses)',
+        {
+          doneStatuses: [AgroTrackStatus.COMPLETED, AgroTrackStatus.CANCELLED],
+        },
+      )
+      .andWhere(
+        '(buyRequest.agroTrackSyncedAt IS NULL OR buyRequest.agroTrackSyncedAt < :cutoff)',
+        { cutoff },
+      )
       .andWhere('buyRequest.isDeleted = FALSE')
       .getMany();
 
@@ -45,11 +55,15 @@ export class AgroTrackReconciliationScheduler {
       return;
     }
 
-    this.logger.log(`Reconciling ${staleRequests.length} stale AgroTrack order(s)`);
+    this.logger.log(
+      `Reconciling ${staleRequests.length} stale AgroTrack order(s)`,
+    );
 
     for (const buyRequest of staleRequests) {
       try {
-        const remoteStatus = await this.agroTrackIntegration.getOrderStatus(buyRequest.id);
+        const remoteStatus = await this.agroTrackIntegration.getOrderStatus(
+          buyRequest.id,
+        );
         if (!remoteStatus) {
           continue; // AgroTrack has no record for this id — nothing to reconcile yet
         }
@@ -59,7 +73,10 @@ export class AgroTrackReconciliationScheduler {
         buyRequest.agroTrackSyncedAt = new Date();
         await this.buyRequestsRepository.save(buyRequest);
       } catch (error) {
-        this.logger.error(`Reconciliation failed for buyRequest ${buyRequest.id}: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Reconciliation failed for buyRequest ${buyRequest.id}: ${message}`,
+        );
       }
     }
   }

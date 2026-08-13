@@ -24,12 +24,20 @@ describe('AgroTrackIntegrationService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AgroTrackIntegrationService,
-        { provide: AgroTrackClientService, useValue: { signRequest: signRequestMock } },
-        { provide: ConfigService, useValue: { get: (key: string) => config[key] } },
+        {
+          provide: AgroTrackClientService,
+          useValue: { signRequest: signRequestMock },
+        },
+        {
+          provide: ConfigService,
+          useValue: { get: (key: string) => config[key] },
+        },
       ],
     }).compile();
 
-    service = module.get<AgroTrackIntegrationService>(AgroTrackIntegrationService);
+    service = module.get<AgroTrackIntegrationService>(
+      AgroTrackIntegrationService,
+    );
   });
 
   afterEach(() => {
@@ -49,44 +57,66 @@ describe('AgroTrackIntegrationService', () => {
       mockFetchOnce(200, { success: true, data: { estimated_cost: 19500 } });
 
       const result = await service.estimateCost({
-        pickupState: 'Kano', pickupLga: 'Kano Municipal',
-        deliveryState: 'Lagos', deliveryLga: 'Ikeja',
+        pickupState: 'Kano',
+        pickupLga: 'Kano Municipal',
+        deliveryState: 'Lagos',
+        deliveryLga: 'Ikeja',
       });
 
       expect(result).toEqual({ estimated_cost: 19500 });
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toBe('https://agrotrack-production.up.railway.app/api/v1/public/estimate/');
+      expect(url).toBe(
+        'https://agrotrack-production.up.railway.app/api/v1/public/estimate/',
+      );
       const sentBody = JSON.parse(init.body);
       expect(sentBody).toMatchObject({
-        pickup_state: 'Kano', pickup_lga: 'Kano Municipal',
-        delivery_state: 'Lagos', delivery_lga: 'Ikeja', cargo_priority: 'standard',
+        pickup_state: 'Kano',
+        pickup_lga: 'Kano Municipal',
+        delivery_state: 'Lagos',
+        delivery_lga: 'Ikeja',
+        cargo_priority: 'standard',
       });
     });
 
     it('throws with the server message on a non-2xx response', async () => {
       mockFetchOnce(400, { success: false, message: 'Invalid state.' });
       await expect(
-        service.estimateCost({ pickupState: 'X', pickupLga: 'Y', deliveryState: 'Z', deliveryLga: 'W' }),
+        service.estimateCost({
+          pickupState: 'X',
+          pickupLga: 'Y',
+          deliveryState: 'Z',
+          deliveryLga: 'W',
+        }),
       ).rejects.toThrow('Invalid state.');
     });
   });
 
   describe('createOrder', () => {
     it('signs the payload and sends the exact rawBody, not a re-serialized object', async () => {
-      mockFetchOnce(201, { success: true, data: { tracking_number: 'AGT30349900', id: 42 } });
+      mockFetchOnce(201, {
+        success: true,
+        data: { tracking_number: 'AGT30349900', id: 42 },
+      });
 
       const result = await service.createOrder({ oko_request_id: 'abc' });
 
       expect(result).toEqual({ trackingNumber: 'AGT30349900', orderId: 42 });
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toBe('https://agrotrack-production.up.railway.app/api/v1/integrations/oko/orders/');
+      expect(url).toBe(
+        'https://agrotrack-production.up.railway.app/api/v1/integrations/oko/orders/',
+      );
       expect(init.body).toBe('{"signed":true}');
       expect(init.headers['X-Api-Key']).toBe('k');
     });
 
     it('raises AgroTrackSenderUnresolvedError on 409, distinct from other failures', async () => {
-      mockFetchOnce(409, { success: false, message: 'Sender could not be resolved.' });
-      await expect(service.createOrder({})).rejects.toBeInstanceOf(AgroTrackSenderUnresolvedError);
+      mockFetchOnce(409, {
+        success: false,
+        message: 'Sender could not be resolved.',
+      });
+      await expect(service.createOrder({})).rejects.toBeInstanceOf(
+        AgroTrackSenderUnresolvedError,
+      );
     });
 
     it('raises a plain Error on other failures', async () => {
@@ -101,29 +131,44 @@ describe('AgroTrackIntegrationService', () => {
     it('signs the request bodyless — no payload argument to signRequest', async () => {
       mockFetchOnce(200, {
         success: true,
-        data: { id: 42, tracking_number: 'AGT30349900', status: 'in_transit', updated_at: '2026-08-14T09:12:00Z' },
+        data: {
+          id: 42,
+          tracking_number: 'AGT30349900',
+          status: 'in_transit',
+          updated_at: '2026-08-14T09:12:00Z',
+        },
       });
 
       const result = await service.getOrderStatus('req-1');
 
       expect(signRequestMock).toHaveBeenCalledWith();
       expect(result).toEqual({
-        id: 42, trackingNumber: 'AGT30349900', status: 'in_transit', updatedAt: '2026-08-14T09:12:00Z',
+        id: 42,
+        trackingNumber: 'AGT30349900',
+        status: 'in_transit',
+        updatedAt: '2026-08-14T09:12:00Z',
       });
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toBe('https://agrotrack-production.up.railway.app/api/v1/integrations/oko/orders/req-1/');
+      expect(url).toBe(
+        'https://agrotrack-production.up.railway.app/api/v1/integrations/oko/orders/req-1/',
+      );
       expect(init.method).toBe('GET');
     });
 
     it('returns null on 404 instead of throwing — no order yet is an expected outcome', async () => {
-      mockFetchOnce(404, { success: false, message: 'No order found for this oko_request_id.' });
+      mockFetchOnce(404, {
+        success: false,
+        message: 'No order found for this oko_request_id.',
+      });
       const result = await service.getOrderStatus('req-missing');
       expect(result).toBeNull();
     });
 
     it('throws on other failures', async () => {
       mockFetchOnce(500, { success: false, message: 'Server error.' });
-      await expect(service.getOrderStatus('req-1')).rejects.toThrow('Server error.');
+      await expect(service.getOrderStatus('req-1')).rejects.toThrow(
+        'Server error.',
+      );
     });
   });
 
@@ -135,13 +180,17 @@ describe('AgroTrackIntegrationService', () => {
 
       expect(signRequestMock).toHaveBeenCalledWith();
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toBe('https://agrotrack-production.up.railway.app/api/v1/integrations/oko/orders/req-1/cancel/');
+      expect(url).toBe(
+        'https://agrotrack-production.up.railway.app/api/v1/integrations/oko/orders/req-1/cancel/',
+      );
       expect(init.method).toBe('POST');
     });
 
     it('raises AgroTrackCancellationRejectedError on 409, distinct from other failures', async () => {
       mockFetchOnce(409, { success: false, message: 'Already in transit.' });
-      await expect(service.cancelOrder('req-1')).rejects.toBeInstanceOf(AgroTrackCancellationRejectedError);
+      await expect(service.cancelOrder('req-1')).rejects.toBeInstanceOf(
+        AgroTrackCancellationRejectedError,
+      );
     });
 
     it('raises a plain Error on other failures', async () => {
@@ -154,6 +203,43 @@ describe('AgroTrackIntegrationService', () => {
     it('resolves without a value on success (nothing to return)', async () => {
       mockFetchOnce(200, { success: true, message: 'Order cancelled.' });
       await expect(service.cancelOrder('req-1')).resolves.toBeUndefined();
+    });
+  });
+
+  describe('issueSsoHandoffToken', () => {
+    it('signs oko_user_id and returns the token/expiry on success', async () => {
+      mockFetchOnce(201, {
+        success: true,
+        data: { token: 'abc123', expires_at: '2026-08-14T09:14:00Z' },
+      });
+
+      const result = await service.issueSsoHandoffToken('farmer-1');
+
+      expect(result).toEqual({
+        token: 'abc123',
+        expiresAt: '2026-08-14T09:14:00Z',
+      });
+      expect(signRequestMock).toHaveBeenCalledWith({ oko_user_id: 'farmer-1' });
+      const [url] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toBe(
+        'https://agrotrack-production.up.railway.app/api/v1/integrations/oko/sso/handoff-token/',
+      );
+    });
+
+    it('returns null on 404 — no linked account is an expected outcome, not an error', async () => {
+      mockFetchOnce(404, {
+        success: false,
+        message: 'No AgroTrack account is linked for this Oko user yet.',
+      });
+      const result = await service.issueSsoHandoffToken('farmer-unlinked');
+      expect(result).toBeNull();
+    });
+
+    it('throws on other failures', async () => {
+      mockFetchOnce(500, { success: false, message: 'Server error.' });
+      await expect(service.issueSsoHandoffToken('farmer-1')).rejects.toThrow(
+        'Server error.',
+      );
     });
   });
 });

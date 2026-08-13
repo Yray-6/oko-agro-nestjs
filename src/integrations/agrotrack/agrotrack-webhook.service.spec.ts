@@ -24,14 +24,19 @@ describe('AgroTrackWebhookService', () => {
       findOne: jest.fn().mockResolvedValue(buyRequest),
       save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
     };
-    const service = new AgroTrackWebhookService(eventsRepository as any, buyRequestsRepository as any);
+    const service = new AgroTrackWebhookService(
+      eventsRepository as any,
+      buyRequestsRepository as any,
+    );
     return { service, eventsRepository, buyRequestsRepository };
   };
 
   it('updates agroTrackStatus/agroTrackOrderId/agroTrackSyncedAt only — never orderState or paymentConfirmed', async () => {
     const buyRequest = {
-      id: 'br-1', agroTrackSyncedAt: null,
-      orderState: 'awaiting_shipping', paymentConfirmed: false,
+      id: 'br-1',
+      agroTrackSyncedAt: null,
+      orderState: 'awaiting_shipping',
+      paymentConfirmed: false,
     };
     const { service, buyRequestsRepository } = buildService(buyRequest);
 
@@ -59,8 +64,13 @@ describe('AgroTrackWebhookService', () => {
   });
 
   it('ignores an out-of-order webhook older than the last synced status', async () => {
-    const buyRequest = { id: 'br-1', agroTrackSyncedAt: new Date('2026-08-14T10:00:00Z'), agroTrackStatus: AgroTrackStatus.DELIVERED };
-    const { service, buyRequestsRepository, eventsRepository } = buildService(buyRequest);
+    const buyRequest = {
+      id: 'br-1',
+      agroTrackSyncedAt: new Date('2026-08-14T10:00:00Z'),
+      agroTrackStatus: AgroTrackStatus.DELIVERED,
+    };
+    const { service, buyRequestsRepository, eventsRepository } =
+      buildService(buyRequest);
 
     await service.handleStatusChanged(basePayload); // occurred_at is earlier than agroTrackSyncedAt
 
@@ -70,7 +80,8 @@ describe('AgroTrackWebhookService', () => {
   });
 
   it('still records the event as processed for an unknown oko_request_id, without throwing', async () => {
-    const { service, buyRequestsRepository, eventsRepository } = buildService(null);
+    const { service, buyRequestsRepository, eventsRepository } =
+      buildService(null);
 
     const result = await service.handleStatusChanged(basePayload);
 

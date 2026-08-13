@@ -2,9 +2,17 @@ import { AgroTrackReconciliationScheduler } from './agrotrack-reconciliation.sch
 import { AgroTrackStatus } from 'src/buy-requests/entities/buy-request.entity';
 
 describe('AgroTrackReconciliationScheduler', () => {
-  const staleRequest = { id: 'br-1', agroTrackTrackingNumber: 'AGT1', agroTrackStatus: AgroTrackStatus.PENDING_PICKUP, agroTrackSyncedAt: null };
+  const staleRequest = {
+    id: 'br-1',
+    agroTrackTrackingNumber: 'AGT1',
+    agroTrackStatus: AgroTrackStatus.PENDING_PICKUP,
+    agroTrackSyncedAt: null,
+  };
 
-  const buildScheduler = (staleRequests: any[], getOrderStatusImpl?: jest.Mock) => {
+  const buildScheduler = (
+    staleRequests: any[],
+    getOrderStatusImpl?: jest.Mock,
+  ) => {
     const queryBuilder: any = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -15,17 +23,29 @@ describe('AgroTrackReconciliationScheduler', () => {
       save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
     };
     const agroTrackIntegration = {
-      getOrderStatus: getOrderStatusImpl ?? jest.fn().mockResolvedValue({
-        id: 42, trackingNumber: 'AGT1', status: 'in_transit', updatedAt: '2026-08-14T09:00:00Z',
-      }),
+      getOrderStatus:
+        getOrderStatusImpl ??
+        jest.fn().mockResolvedValue({
+          id: 42,
+          trackingNumber: 'AGT1',
+          status: 'in_transit',
+          updatedAt: '2026-08-14T09:00:00Z',
+        }),
     };
-    const scheduler = new AgroTrackReconciliationScheduler(buyRequestsRepository as any, agroTrackIntegration as any);
+    const scheduler = new AgroTrackReconciliationScheduler(
+      buyRequestsRepository as any,
+      agroTrackIntegration as any,
+    );
     return { scheduler, buyRequestsRepository, agroTrackIntegration };
   };
 
   const withScheduler = process.env.RUN_SCHEDULER;
-  beforeEach(() => { process.env.RUN_SCHEDULER = 'true'; });
-  afterEach(() => { process.env.RUN_SCHEDULER = withScheduler; });
+  beforeEach(() => {
+    process.env.RUN_SCHEDULER = 'true';
+  });
+  afterEach(() => {
+    process.env.RUN_SCHEDULER = withScheduler;
+  });
 
   it('does nothing when RUN_SCHEDULER is not true', async () => {
     process.env.RUN_SCHEDULER = 'false';
@@ -35,7 +55,8 @@ describe('AgroTrackReconciliationScheduler', () => {
   });
 
   it('pulls status for each stale request and updates agroTrackStatus/agroTrackOrderId/agroTrackSyncedAt', async () => {
-    const { scheduler, buyRequestsRepository, agroTrackIntegration } = buildScheduler([staleRequest]);
+    const { scheduler, buyRequestsRepository, agroTrackIntegration } =
+      buildScheduler([staleRequest]);
 
     await scheduler.reconcileStaleOrders();
 
@@ -48,7 +69,8 @@ describe('AgroTrackReconciliationScheduler', () => {
 
   it('skips a request AgroTrack has no record of (404 -> null) without erroring', async () => {
     const { scheduler, buyRequestsRepository } = buildScheduler(
-      [staleRequest], jest.fn().mockResolvedValue(null),
+      [staleRequest],
+      jest.fn().mockResolvedValue(null),
     );
     await scheduler.reconcileStaleOrders();
     expect(buyRequestsRepository.save).not.toHaveBeenCalled();
@@ -56,11 +78,20 @@ describe('AgroTrackReconciliationScheduler', () => {
 
   it("one request's failure doesn't stop the rest of the batch from being processed", async () => {
     const second = { ...staleRequest, id: 'br-2' };
-    const getOrderStatus = jest.fn()
+    const getOrderStatus = jest
+      .fn()
       .mockRejectedValueOnce(new Error('network blip'))
-      .mockResolvedValueOnce({ id: 43, trackingNumber: 'AGT2', status: 'delivered', updatedAt: '2026-08-14T09:00:00Z' });
+      .mockResolvedValueOnce({
+        id: 43,
+        trackingNumber: 'AGT2',
+        status: 'delivered',
+        updatedAt: '2026-08-14T09:00:00Z',
+      });
 
-    const { scheduler, buyRequestsRepository } = buildScheduler([staleRequest, second], getOrderStatus);
+    const { scheduler, buyRequestsRepository } = buildScheduler(
+      [staleRequest, second],
+      getOrderStatus,
+    );
 
     await scheduler.reconcileStaleOrders();
 

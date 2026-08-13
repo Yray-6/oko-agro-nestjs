@@ -17,15 +17,22 @@ import { AgroTrackClientModule } from 'src/integrations/agrotrack/agrotrack-clie
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([BuyRequest, Crop, QualityStandard, Product, PurchaseOrderDocFile, User]),
+    TypeOrmModule.forFeature([
+      BuyRequest,
+      Crop,
+      QualityStandard,
+      Product,
+      PurchaseOrderDocFile,
+      User,
+    ]),
     PurchaseOrderDocFilesModule,
     AuthModule,
     UsersModule,
     NotificationsModule,
     ProductInventoriesModule,
-    AgroTrackClientModule
+    AgroTrackClientModule,
   ],
   providers: [BuyRequestsService],
-  controllers: [BuyRequestsController]
+  controllers: [BuyRequestsController],
 })
 export class BuyRequestsModule {}

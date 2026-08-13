@@ -45,7 +45,9 @@ describe('AgroTrackClientService', () => {
     const first = service.signRequest({ a: 1 });
     const second = service.signRequest({ a: 2 });
 
-    expect(first.headers['X-Signature']).not.toBe(second.headers['X-Signature']);
+    expect(first.headers['X-Signature']).not.toBe(
+      second.headers['X-Signature'],
+    );
   });
 
   it('throws if AGROTRACK_API_KEY is missing', async () => {
@@ -54,7 +56,10 @@ describe('AgroTrackClientService', () => {
   });
 
   it('throws if AGROTRACK_HMAC_SECRET is missing', async () => {
-    const service = await buildService({ ...config, AGROTRACK_HMAC_SECRET: '' });
+    const service = await buildService({
+      ...config,
+      AGROTRACK_HMAC_SECRET: '',
+    });
     expect(() => service.signRequest({})).toThrow(/not configured/);
   });
 

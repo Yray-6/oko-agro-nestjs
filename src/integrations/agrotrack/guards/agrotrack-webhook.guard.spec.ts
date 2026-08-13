@@ -7,10 +7,14 @@ describe('AgroTrackWebhookGuard', () => {
   const SECRET = 'webhook-secret';
 
   const buildGuard = (secret: string | undefined = SECRET) =>
-    new AgroTrackWebhookGuard({ get: () => secret } as unknown as ConfigService);
+    new AgroTrackWebhookGuard({
+      get: () => secret,
+    } as unknown as ConfigService);
 
   const buildContext = (overrides: {
-    signature?: string; timestamp?: string; rawBody?: Buffer;
+    signature?: string;
+    timestamp?: string;
+    rawBody?: Buffer;
   }): ExecutionContext => {
     const request = {
       headers: {
@@ -25,7 +29,10 @@ describe('AgroTrackWebhookGuard', () => {
   };
 
   const sign = (timestamp: string, rawBody: string) =>
-    crypto.createHmac('sha256', SECRET).update(`${timestamp}.${rawBody}`).digest('hex');
+    crypto
+      .createHmac('sha256', SECRET)
+      .update(`${timestamp}.${rawBody}`)
+      .digest('hex');
 
   it('allows a correctly signed, fresh request', () => {
     const guard = buildGuard();
@@ -33,14 +40,17 @@ describe('AgroTrackWebhookGuard', () => {
     const rawBody = Buffer.from('{"status":"in_transit"}');
     const signature = sign(timestamp, rawBody.toString());
 
-    const result = guard.canActivate(buildContext({ signature, timestamp, rawBody }));
+    const result = guard.canActivate(
+      buildContext({ signature, timestamp, rawBody }),
+    );
     expect(result).toBe(true);
   });
 
   it('rejects a request missing signature headers', () => {
     const guard = buildGuard();
-    expect(() => guard.canActivate(buildContext({ rawBody: Buffer.from('{}') })))
-      .toThrow(UnauthorizedException);
+    expect(() =>
+      guard.canActivate(buildContext({ rawBody: Buffer.from('{}') })),
+    ).toThrow(UnauthorizedException);
   });
 
   it('rejects when webhook verification is not configured', () => {
@@ -48,7 +58,9 @@ describe('AgroTrackWebhookGuard', () => {
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const rawBody = Buffer.from('{}');
     expect(() =>
-      guard.canActivate(buildContext({ signature: 'whatever', timestamp, rawBody })),
+      guard.canActivate(
+        buildContext({ signature: 'whatever', timestamp, rawBody }),
+      ),
     ).toThrow(UnauthorizedException);
   });
 
@@ -60,7 +72,9 @@ describe('AgroTrackWebhookGuard', () => {
     const tamperedBody = Buffer.from('{"status":"delivered"}');
 
     expect(() =>
-      guard.canActivate(buildContext({ signature, timestamp, rawBody: tamperedBody })),
+      guard.canActivate(
+        buildContext({ signature, timestamp, rawBody: tamperedBody }),
+      ),
     ).toThrow(UnauthorizedException);
   });
 
@@ -71,7 +85,9 @@ describe('AgroTrackWebhookGuard', () => {
     const signature = sign(staleTimestamp, rawBody.toString());
 
     expect(() =>
-      guard.canActivate(buildContext({ signature, timestamp: staleTimestamp, rawBody })),
+      guard.canActivate(
+        buildContext({ signature, timestamp: staleTimestamp, rawBody }),
+      ),
     ).toThrow(UnauthorizedException);
   });
 });

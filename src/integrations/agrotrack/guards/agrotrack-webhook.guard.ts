@@ -1,6 +1,14 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
+import { Request } from 'express';
+
+type WebhookRequest = Request & { rawBody?: Buffer };
 
 const REPLAY_TOLERANCE_SECONDS = 300; // 5 minutes — mirrors AgroTrack's ServiceAPIKeyAuthentication
 
@@ -16,19 +24,28 @@ export class AgroTrackWebhookGuard implements CanActivate {
   constructor(private readonly configService: ConfigService) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<WebhookRequest>();
 
     const signature = request.headers['x-signature'];
     const timestamp = request.headers['x-timestamp'];
-    const rawBody: Buffer | undefined = request.rawBody;
+    const rawBody = request.rawBody;
 
-    if (!signature || !timestamp || !rawBody) {
+    // Express types a repeated header as string[] — that's already a
+    // malformed request for a header that should only ever be sent once,
+    // so reject it outright rather than guessing how to coerce it.
+    if (
+      !rawBody ||
+      typeof signature !== 'string' ||
+      typeof timestamp !== 'string'
+    ) {
       throw new UnauthorizedException('Missing webhook signature headers.');
     }
 
     const secret = this.configService.get<string>('AGROTRACK_WEBHOOK_SECRET');
     if (!secret) {
-      throw new UnauthorizedException('Webhook verification is not configured.');
+      throw new UnauthorizedException(
+        'Webhook verification is not configured.',
+      );
     }
 
     const requestTime = Number(timestamp);
@@ -36,7 +53,9 @@ export class AgroTrackWebhookGuard implements CanActivate {
       throw new UnauthorizedException('Invalid timestamp.');
     }
     if (Math.abs(Date.now() / 1000 - requestTime) > REPLAY_TOLERANCE_SECONDS) {
-      throw new UnauthorizedException('Request timestamp outside the allowed window.');
+      throw new UnauthorizedException(
+        'Request timestamp outside the allowed window.',
+      );
     }
 
     const expectedSignature = crypto

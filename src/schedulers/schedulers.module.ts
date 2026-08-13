@@ -12,7 +12,7 @@ import { AgroTrackClientModule } from 'src/integrations/agrotrack/agrotrack-clie
     ScheduleModule.forRoot(), // Enables scheduling globally - This boots up the global scheduler engine
     TypeOrmModule.forFeature([BuyRequest]), // For repository access
     ProductInventoriesModule,
-    AgroTrackClientModule
+    AgroTrackClientModule,
   ],
   providers: [BuyRequestsScheduler, AgroTrackReconciliationScheduler],
 })

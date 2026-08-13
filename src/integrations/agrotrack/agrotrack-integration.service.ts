@@ -37,6 +37,29 @@ export interface AgroTrackOrderStatus {
   updatedAt: string;
 }
 
+export interface AgroTrackSsoHandoff {
+  token: string;
+  expiresAt: string;
+}
+
+/** AgroTrack's standard {success, message, data} response envelope. */
+interface AgroTrackEnvelope<T = unknown> {
+  success: boolean;
+  message?: string;
+  data?: T;
+}
+
+/**
+ * fetch()'s response.json() is typed Promise<any> — this is the one place
+ * that `any` gets cast to a known shape, so every call site below works
+ * with real types instead of letting `any` spread through the file.
+ */
+async function readEnvelope<T = unknown>(
+  response: Response,
+): Promise<AgroTrackEnvelope<T>> {
+  return (await response.json()) as AgroTrackEnvelope<T>;
+}
+
 /**
  * Calls AgroTrack's public estimate endpoint and the service-authenticated
  * create endpoint (accounts.authentication.ServiceAPIKeyAuthentication /
@@ -78,30 +101,44 @@ export class AgroTrackIntegrationService {
       }),
     });
 
-    const body = await response.json();
-    if (!response.ok) {
-      throw new Error(body?.message ?? 'AgroTrack estimate request failed');
+    const body = await readEnvelope<AgroTrackEstimate>(response);
+    if (!response.ok || !body.data) {
+      throw new Error(body.message ?? 'AgroTrack estimate request failed');
     }
     return body.data;
   }
 
-  async createOrder(payload: Record<string, unknown>): Promise<AgroTrackOrderResult> {
+  async createOrder(
+    payload: Record<string, unknown>,
+  ): Promise<AgroTrackOrderResult> {
     const { headers, rawBody } = this.agroTrackClient.signRequest(payload);
 
-    const response = await fetch(`${this.baseUrl}/api/v1/integrations/oko/orders/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...headers },
-      body: rawBody,
-    });
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/integrations/oko/orders/`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: rawBody,
+      },
+    );
 
-    const body = await response.json();
+    const body = await readEnvelope<{ tracking_number: string; id: number }>(
+      response,
+    );
 
     if (response.status === 409) {
-      throw new AgroTrackSenderUnresolvedError(body?.message ?? 'Sender could not be resolved');
+      throw new AgroTrackSenderUnresolvedError(
+        body.message ?? 'Sender could not be resolved',
+      );
     }
-    if (!response.ok) {
-      this.logger.error(`AgroTrack create failed (${response.status}): ${body?.message}`);
-      throw new Error(body?.message ?? `AgroTrack create failed with status ${response.status}`);
+    if (!response.ok || !body.data) {
+      this.logger.error(
+        `AgroTrack create failed (${response.status}): ${body.message ?? ''}`,
+      );
+      throw new Error(
+        body.message ??
+          `AgroTrack create failed with status ${response.status}`,
+      );
     }
 
     return {
@@ -116,22 +153,37 @@ export class AgroTrackIntegrationService {
    * for this oko_request_id) rather than throwing, since that's an expected,
    * non-error outcome for a reconciliation sweep.
    */
-  async getOrderStatus(okoRequestId: string): Promise<AgroTrackOrderStatus | null> {
+  async getOrderStatus(
+    okoRequestId: string,
+  ): Promise<AgroTrackOrderStatus | null> {
     const { headers } = this.agroTrackClient.signRequest();
 
-    const response = await fetch(`${this.baseUrl}/api/v1/integrations/oko/orders/${okoRequestId}/`, {
-      method: 'GET',
-      headers: { ...headers },
-    });
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/integrations/oko/orders/${okoRequestId}/`,
+      {
+        method: 'GET',
+        headers: { ...headers },
+      },
+    );
 
     if (response.status === 404) {
       return null;
     }
 
-    const body = await response.json();
-    if (!response.ok) {
-      this.logger.error(`AgroTrack status pull failed (${response.status}): ${body?.message}`);
-      throw new Error(body?.message ?? `AgroTrack status pull failed with status ${response.status}`);
+    const body = await readEnvelope<{
+      id: number;
+      tracking_number: string;
+      status: string;
+      updated_at: string;
+    }>(response);
+    if (!response.ok || !body.data) {
+      this.logger.error(
+        `AgroTrack status pull failed (${response.status}): ${body.message ?? ''}`,
+      );
+      throw new Error(
+        body.message ??
+          `AgroTrack status pull failed with status ${response.status}`,
+      );
     }
 
     return {
@@ -150,19 +202,74 @@ export class AgroTrackIntegrationService {
   async cancelOrder(okoRequestId: string): Promise<void> {
     const { headers } = this.agroTrackClient.signRequest();
 
-    const response = await fetch(`${this.baseUrl}/api/v1/integrations/oko/orders/${okoRequestId}/cancel/`, {
-      method: 'POST',
-      headers: { ...headers },
-    });
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/integrations/oko/orders/${okoRequestId}/cancel/`,
+      {
+        method: 'POST',
+        headers: { ...headers },
+      },
+    );
 
     if (response.status === 409) {
-      const body = await response.json();
-      throw new AgroTrackCancellationRejectedError(body?.message ?? 'Shipment can no longer be cancelled automatically');
+      const body = await readEnvelope(response);
+      throw new AgroTrackCancellationRejectedError(
+        body.message ?? 'Shipment can no longer be cancelled automatically',
+      );
     }
     if (!response.ok) {
-      const body = await response.json();
-      this.logger.error(`AgroTrack cancel failed (${response.status}): ${body?.message}`);
-      throw new Error(body?.message ?? `AgroTrack cancel failed with status ${response.status}`);
+      const body = await readEnvelope(response);
+      this.logger.error(
+        `AgroTrack cancel failed (${response.status}): ${body.message ?? ''}`,
+      );
+      throw new Error(
+        body.message ??
+          `AgroTrack cancel failed with status ${response.status}`,
+      );
     }
+  }
+
+  /**
+   * Mints a short-lived, single-use token so a farmer already authenticated
+   * on Oko can skip a second login on AgroTrack (Package 6). Returns null on
+   * 404 — the farmer has no linked AgroTrack account yet (e.g. never
+   * arranged a shipment), which is an expected outcome, not an error.
+   */
+  async issueSsoHandoffToken(
+    okoUserId: string,
+  ): Promise<AgroTrackSsoHandoff | null> {
+    const { headers, rawBody } = this.agroTrackClient.signRequest({
+      oko_user_id: okoUserId,
+    });
+
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/integrations/oko/sso/handoff-token/`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: rawBody,
+      },
+    );
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    const body = await readEnvelope<{ token: string; expires_at: string }>(
+      response,
+    );
+    if (!response.ok || !body.data) {
+      this.logger.error(
+        `AgroTrack SSO handoff-token request failed (${response.status}): ${body.message ?? ''}`,
+      );
+      throw new Error(
+        body.message ??
+          `AgroTrack SSO handoff-token request failed with status ${response.status}`,
+      );
+    }
+
+    return {
+      token: body.data.token,
+      expiresAt: body.data.expires_at,
+    };
   }
 }

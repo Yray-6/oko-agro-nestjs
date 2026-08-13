@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsDateString,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 /** Matches the payload shape signed by AgroTrack's oko_integration.webhook_signing. */
 export class WebhookOrderStatusChangedDto {
@@ -15,7 +21,9 @@ export class WebhookOrderStatusChangedDto {
   @IsDateString()
   occurred_at: string;
 
-  @ApiProperty({ description: "AgroTrack's oko_request_id — this buy request's own id" })
+  @ApiProperty({
+    description: "AgroTrack's oko_request_id — this buy request's own id",
+  })
   @IsUUID()
   oko_request_id: string;
 

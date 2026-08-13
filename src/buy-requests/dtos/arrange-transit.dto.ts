@@ -85,13 +85,17 @@ export class ArrangeTransitDto {
   @IsNumber()
   cargoValue: number;
 
-  @ApiPropertyOptional({ enum: ['standard', 'express', 'same_day'], default: 'standard' })
+  @ApiPropertyOptional({
+    enum: ['standard', 'express', 'same_day'],
+    default: 'standard',
+  })
   @IsOptional()
   @IsIn(['standard', 'express', 'same_day'])
   cargoPriority?: string;
 
   @ApiPropertyOptional({
-    description: "Farmer acknowledged Oko's one-time shadow-account notice, if this is their first AgroTrack order.",
+    description:
+      "Farmer acknowledged Oko's one-time shadow-account notice, if this is their first AgroTrack order.",
   })
   @IsOptional()
   @IsBoolean()
