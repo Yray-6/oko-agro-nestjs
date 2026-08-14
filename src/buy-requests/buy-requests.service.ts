@@ -159,6 +159,8 @@ export class BuyRequestsService {
           relations: ['owner', 'cropType'],
         });
         if (!product) throw new BadRequestException('Invalid productId');
+
+        this.assertSufficientAvailableStock(product, dto.productQuantityKg);
       }
 
       if (dto.productId && product && product.cropType.id !== dto.cropId) {
@@ -254,7 +256,7 @@ export class BuyRequestsService {
     try {
       const buyRequest = await this.buyRequestsRepository.findOne({
         where: { id: dto.buyRequestId, isDeleted: false },
-        relations: ['buyer', 'qualityStandardType'],
+        relations: ['buyer', 'qualityStandardType', 'product'],
       });
 
       if (!buyRequest) {
@@ -305,6 +307,21 @@ export class BuyRequestsService {
         if (dto[field] !== undefined && dto[field] !== null) {
           (buyRequest as any)[field] = dto[field];
         }
+      }
+
+      // Validate stock when quantity changes on a product-linked request
+      if (
+        dto.productQuantityKg !== undefined &&
+        dto.productQuantityKg !== null &&
+        buyRequest.product
+      ) {
+        const product = await this.productsRepository.findOne({
+          where: { id: buyRequest.product.id, isDeleted: false },
+        });
+        if (!product) {
+          throw new BadRequestException('Linked product not found or deleted');
+        }
+        this.assertSufficientAvailableStock(product, dto.productQuantityKg);
       }
 
       // Reset status to PENDING
@@ -1531,5 +1548,23 @@ export class BuyRequestsService {
 
     if (last.length === 0) return 100001;
     return Number(last[0].requestNumber) + 1;
+  }
+
+  private assertSufficientAvailableStock(
+    product: Product,
+    requestedQuantityKg: string,
+  ): void {
+    const quantity = new Decimal(requestedQuantityKg);
+    const totalQuantity = new Decimal(product.quantityKg);
+    const reservedQuantity = new Decimal(product.reservedQuantityKg);
+    const available = totalQuantity.minus(reservedQuantity);
+
+    if (quantity.lte(0)) {
+      throw new BadRequestException('Invalid product quantity');
+    }
+
+    if (quantity.greaterThan(available)) {
+      throw new BadRequestException('Insufficient available stock');
+    }
   }
 }
