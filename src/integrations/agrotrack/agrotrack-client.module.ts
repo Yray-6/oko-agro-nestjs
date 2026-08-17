@@ -8,6 +8,8 @@ import { AgroTrackSsoController } from './agrotrack-sso.controller';
 import { AgroTrackWebhookEvent } from './entities/agrotrack-webhook-event.entity';
 import { BuyRequest } from 'src/buy-requests/entities/buy-request.entity';
 import { AuthModule } from 'src/auth/auth.module';
+import { AgroTrackPricingConfigService } from './pricing/agrotrack-pricing-config.service';
+import { LocalShippingCostEstimatorService } from './pricing/local-shipping-cost-estimator.service';
 
 @Module({
   imports: [
@@ -19,7 +21,13 @@ import { AuthModule } from 'src/auth/auth.module';
     AgroTrackClientService,
     AgroTrackIntegrationService,
     AgroTrackWebhookService,
+    AgroTrackPricingConfigService,
+    LocalShippingCostEstimatorService,
   ],
-  exports: [AgroTrackClientService, AgroTrackIntegrationService],
+  exports: [
+    AgroTrackClientService,
+    AgroTrackIntegrationService,
+    LocalShippingCostEstimatorService,
+  ],
 })
 export class AgroTrackClientModule {}

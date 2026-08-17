@@ -55,6 +55,11 @@ import {
   AgroTrackOrderResult,
   AgroTrackSenderUnresolvedError,
 } from 'src/integrations/agrotrack/agrotrack-integration.service';
+import { EstimateShippingCostDto } from './dtos/estimate-shipping-cost.dto';
+import {
+  LocalShippingCostEstimatorService,
+  UnresolvableAddressError,
+} from 'src/integrations/agrotrack/pricing/local-shipping-cost-estimator.service';
 
 @Injectable()
 export class BuyRequestsService {
@@ -75,7 +80,49 @@ export class BuyRequestsService {
     private readonly productInventoriesService: ProductInventoriesService,
     private readonly dataSource: DataSource,
     private readonly agroTrackIntegration: AgroTrackIntegrationService,
+    private readonly localShippingCostEstimator: LocalShippingCostEstimatorService,
   ) {}
+
+  /**
+   * Live shipping-cost preview, computed locally (geocoding/road-distance
+   * go straight to Nominatim/OSRM, pricing config is cached from AgroTrack)
+   * instead of round-tripping through AgroTrack's own /public/estimate/
+   * endpoint for every keystroke of the arrange-transit form. Preview only —
+   * arrangeTransitViaAgroTrack still gets the authoritative price back from
+   * AgroTrack itself when the shipment is actually created.
+   */
+  async estimateShippingCost(dto: EstimateShippingCostDto): Promise<any> {
+    try {
+      const estimate = await this.localShippingCostEstimator.estimate({
+        pickupState: dto.pickupState,
+        pickupLga: dto.pickupLga,
+        deliveryState: dto.deliveryState,
+        deliveryLga: dto.deliveryLga,
+        cargoPriority: dto.cargoPriority,
+      });
+
+      return {
+        statusCode: 200,
+        message: 'Cost estimate calculated successfully.',
+        data: {
+          estimatedCost: estimate.estimated_cost,
+          baseRate: estimate.base_rate,
+          distanceCharge: estimate.distance_charge,
+          distanceKm: estimate.distance_km,
+          priorityMultiplier: estimate.priority_multiplier,
+          distanceMethod: estimate.distance_method,
+        },
+      };
+    } catch (error) {
+      if (error instanceof UnresolvableAddressError) {
+        throw new BadRequestException(error.message);
+      }
+      handleServiceError(
+        error,
+        'An error occurred while estimating the shipping cost',
+      );
+    }
+  }
 
   async create(dto: CreateBuyRequestDto, buyer: User): Promise<any> {
     const {

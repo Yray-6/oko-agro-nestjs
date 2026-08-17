@@ -34,6 +34,7 @@ describe('BuyRequestsService.cancelAgroTrackShipment', () => {
       {} as any,
       {} as any,
       agroTrackIntegration as any,
+      {} as any,
     );
     return { service, buyRequestsRepository, agroTrackIntegration };
   };

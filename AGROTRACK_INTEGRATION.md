@@ -33,6 +33,7 @@ together by one id — a buy request's own `id`, sent to AgroTrack as
 | 4 | Inbound webhooks + reconciliation | `AgroTrackWebhookGuard`/`Controller`/`Service`, `AgroTrackReconciliationScheduler` |
 | 5 | Cancellation | `cancelOrder()`, `cancelAgroTrackShipment()`, `PUT :id/cancel-transit` |
 | 6 | SSO handoff (optional) | `issueSsoHandoffToken()`, `GET integrations/agrotrack/sso-handoff-token` |
+| 7 | Local shipping-cost preview | `pricing/` — geocode/OSRM/formula replicated locally, `POST buy-requests/estimate-shipping-cost` |
 
 All of it lives under `src/integrations/agrotrack/` plus a handful of
 additive methods on `BuyRequestsService`/`BuyRequestsController`. Nothing
@@ -56,8 +57,12 @@ integrations/agrotrack/
 │   └── agrotrack-webhook.guard.ts    # verifies AgroTrack's signed webhooks
 ├── entities/
 │   └── agrotrack-webhook-event.entity.ts   # dedup table
-└── dtos/
-    └── webhook-event.dto.ts
+├── dtos/
+│   └── webhook-event.dto.ts
+└── pricing/
+    ├── geo.util.ts                              # Nominatim/OSRM/Haversine — mirrors AgroTrack's geo.py
+    ├── agrotrack-pricing-config.service.ts       # fetches + caches base_rate/per_km/multipliers
+    └── local-shipping-cost-estimator.service.ts  # the same formula, run locally
 ```
 
 ### New/extended endpoints
@@ -68,12 +73,21 @@ integrations/agrotrack/
 | `PUT` | `/buy-requests/:id/cancel-transit` | JWT (farmer/admin) | Cancel a not-yet-picked-up shipment |
 | `GET` | `/integrations/agrotrack/sso-handoff-token` | JWT | Get a token to skip a second AgroTrack login |
 | `POST` | `/integrations/agrotrack/webhook` | HMAC signature (not JWT) | Receive a status-change event from AgroTrack |
+| `POST` | `/buy-requests/estimate-shipping-cost` | JWT | Live price preview — no order, no AgroTrack round trip |
 
 ### New entity fields
 
 `BuyRequest` — `agroTrackTrackingNumber` (pre-existing), plus:
 `agroTrackOrderId`, `agroTrackStatus` (new `AgroTrackStatus` enum, kept
-deliberately separate from `OrderState`/`paymentConfirmed`), `agroTrackSyncedAt`.
+deliberately separate from `OrderState`/`paymentConfirmed`), `agroTrackSyncedAt`,
+and — populated by `arrangeTransitViaAgroTrack()` from AgroTrack's create
+response — `agroTrackBaseRate`, `agroTrackDistanceSurcharge`,
+`agroTrackTotalCost` (all `decimal(30,2)`, stored and typed as strings, not
+numbers, matching the existing `paymentAmount` convention — Postgres
+decimals lose precision if round-tripped through a JS `number`). Before
+these existed, a successful arrange-transit call returned pricing that had
+already been computed but was silently discarded before reaching the
+frontend.
 
 ### New env vars
 
@@ -137,8 +151,11 @@ Every other service in this module builds on top of this one function.
    couldn't resolve/provision a sender), this is treated as an expected
    outcome, not a crash: returns `200` with `requiresManualFallback: true`
    so the frontend can fall back to a manual arrange-transit flow.
-6. On success, stores `agroTrackTrackingNumber` and `agroTrackOrderId` on
-   the `BuyRequest` and returns it.
+6. On success, stores `agroTrackTrackingNumber`, `agroTrackOrderId`, and
+   the pricing AgroTrack computed for this shipment
+   (`agroTrackBaseRate`/`agroTrackDistanceSurcharge`/`agroTrackTotalCost`)
+   on the `BuyRequest` and returns it — this is the *authoritative* price,
+   distinct from the preview in §4.9.
 
 This never touches `orderState` or `paymentConfirmed` — logistics status
 from AgroTrack is deliberately kept independent of this app's own
@@ -229,19 +246,55 @@ token/expiry for the frontend to redeem against AgroTrack's public
 `POST /api/v1/auth/sso/consume/` — letting the farmer skip AgroTrack's own
 login screen.
 
+### 4.9 Live shipping-cost preview, computed locally (Package 7)
+
+Before a farmer commits to `arrange-transit` (§4.3), they need to see a
+price. The straightforward version of that — call AgroTrack's own
+`POST /api/v1/public/estimate/` on every form change — means a full
+network hop to AgroTrack, which then itself calls Nominatim to geocode
+both addresses and OSRM to route between them, for every quote. This
+package cuts AgroTrack out of that path entirely for the preview.
+
+`pricing/geo.util.ts` reimplements AgroTrack's `public_api/geo.py`
+field-for-field: same Nominatim/OSRM URLs, same 1.3× Nigerian
+road-correction factor, same 5km minimum billable distance, same
+OSRM-then-Haversine fallback order — called directly from here instead of
+through AgroTrack's server.
+
+`pricing/agrotrack-pricing-config.service.ts` fetches the admin-configurable
+pricing knobs (`base_rate`, `distance_surcharge_per_km`, `express_multiplier`,
+`same_day_multiplier`) from AgroTrack's new
+`GET /api/v1/integrations/oko/pricing-config/` (signed the same way as
+every other call in this module — see §4.2), and caches them for 5
+minutes. These values only change when an AgroTrack admin edits Platform
+Settings, so refetching per estimate would defeat the entire point of
+estimating locally. Falls back to AgroTrack's own model defaults if the
+config endpoint is ever unreachable and nothing has been cached yet.
+
+`pricing/local-shipping-cost-estimator.service.ts` runs the identical
+formula AgroTrack uses — `(base_rate + distance_km * per_km) *
+priority_multiplier` — against the geocoded distance and cached config
+above, and is what `POST buy-requests/estimate-shipping-cost` calls.
+
+**This is a preview only.** It never creates anything and is not scoped to
+a specific buy request. The authoritative price is still whatever AgroTrack
+itself computes and returns at order-creation time (§4.3 step 6) — a stale
+pricing-config cache here can only ever make the *preview* slightly off,
+never change what's actually billed.
+
 ---
 
 ## 5. Testing
 
 ```bash
 # Everything this integration touched
-npx jest integrations/agrotrack buy-requests.arrange-transit buy-requests.cancel-transit schedulers/agrotrack-reconciliation
+npx jest integrations/agrotrack buy-requests.arrange-transit buy-requests.cancel-transit buy-requests.estimate-shipping-cost schedulers/agrotrack-reconciliation
 
 # Build
 npx nest build
 ```
 
-49 tests across 8 suites, all passing, build clean.
+78 tests across 12 suites, all passing, build clean.
 
 One thing worth knowing if you run the *full* suite (`npx jest`): ~30
 pre-existing spec files elsewhere in this repo fail — that predates this
@@ -270,3 +323,37 @@ import error, which is what surfaced them as failing for their own
 - **Migrations were hand-written** to match this repo's existing
   migration style (not machine-generated against a live DB) — worth a
   dry run against staging Postgres before trusting them in production.
+- **No frontend calls `estimate-shipping-cost` yet** (§4.9) — same
+  situation as the `ArrangeTransitDto` UI above, the backend is ready but
+  nothing collects/submits pickup/delivery/priority ahead of the arrange
+  step yet.
+
+---
+
+## 7. Changelog since Packages 1–6 were first built
+
+- **Fixed:** `AgroTrackClientService.signRequest()` always
+  `JSON.stringify`'d even when called with no body, breaking every
+  bodyless GET/POST call (`getOrderStatus`, `cancelOrder`,
+  `issueSsoHandoffToken`) — AgroTrack signs over the *actual* raw (empty)
+  body, not the string `"undefined"`. Now signs `''` when `body` is
+  omitted. See §4.2.
+- **Fixed:** a Jest `moduleNameMapper` gap for this project's `src/`
+  import alias blocked even this integration's own new tests from
+  resolving imports — added the mapper. This incidentally unblocked ~30
+  pre-existing, unrelated broken stub test suites elsewhere in the repo to
+  fail for their own reasons instead of an import error; confirmed
+  pre-existing via a `git stash` baseline comparison and left untouched,
+  per this repo's "don't modify code that predates this integration" rule.
+- **Added:** pricing fields (`agroTrackBaseRate`/`agroTrackDistanceSurcharge`/
+  `agroTrackTotalCost`) on `BuyRequest`, populated from AgroTrack's create
+  response — previously computed by AgroTrack but discarded before
+  reaching the frontend. See the note under "New entity fields" in §3.
+- **Added:** Package 7, local shipping-cost preview — see §4.9.
+- **Merged:** a teammate's `LocationsModule` (`src/locations/*`, Nigerian
+  states/LGAs for location pickers) landed on `main` around the same time
+  as this integration. It's independent of everything here, but worth a
+  look together at some point — AgroTrack has its own Nigerian states/LGA
+  dataset (`public_api/data/nigeria_states.json`) backing both the pricing
+  formula and this integration's own `pickupState`/`pickupLga` fields, and
+  it's not yet clear whether the two should be the same source of truth.

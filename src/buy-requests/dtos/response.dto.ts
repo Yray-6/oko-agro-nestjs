@@ -100,6 +100,38 @@ export class BuyRequestCancelTransitResponseDto extends ApiResponseDto<BuyReques
   declare data: BuyRequest;
 }
 
+export class ShippingCostEstimateData {
+  @ApiProperty({ example: 18500 })
+  estimatedCost: number;
+
+  @ApiProperty({ example: 15000 })
+  baseRate: number;
+
+  @ApiProperty({ example: 3500 })
+  distanceCharge: number;
+
+  @ApiProperty({ example: 77.8 })
+  distanceKm: number;
+
+  @ApiProperty({ example: 1.0 })
+  priorityMultiplier: number;
+
+  @ApiProperty({
+    example: 'osrm',
+    description:
+      "'osrm' = actual road routing | 'haversine' = straight-line fallback",
+  })
+  distanceMethod: string;
+}
+
+export class BuyRequestEstimateShippingCostResponseDto extends ApiResponseDto<ShippingCostEstimateData> {
+  @ApiProperty({ example: 'Cost estimate calculated successfully.' })
+  declare message: string;
+
+  @ApiProperty({ type: () => ShippingCostEstimateData })
+  declare data: ShippingCostEstimateData;
+}
+
 export class BuyRequestGeneralListResponseDto extends ApiResponseDto<
   BuyRequest[]
 > {

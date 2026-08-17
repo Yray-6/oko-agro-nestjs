@@ -62,6 +62,7 @@ describe('BuyRequestsService.arrangeTransitViaAgroTrack', () => {
       {} as any,
       {} as any,
       agroTrackIntegration as any,
+      {} as any,
     );
     return { service, buyRequestsRepository, agroTrackIntegration };
   };

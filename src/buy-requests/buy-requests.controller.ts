@@ -45,6 +45,7 @@ import {
   BuyRequestUpdateTrackingResponseDto,
   BuyRequestArrangeTransitResponseDto,
   BuyRequestCancelTransitResponseDto,
+  BuyRequestEstimateShippingCostResponseDto,
   PurchaseOrderDeleteResponseDto,
   DirectBuyRequestResponseDto,
   GetAllBuyRequestsResponseDto,
@@ -52,6 +53,7 @@ import {
 import { UpdateOrderStateDto } from './dtos/update-order-state.dto';
 import { UpdateTrackingDto } from './dtos/update-tracking.dto';
 import { ArrangeTransitDto } from './dtos/arrange-transit.dto';
+import { EstimateShippingCostDto } from './dtos/estimate-shipping-cost.dto';
 import { OngoingBuyRequestOrdersQueryDto } from './dtos/ongoing-buy-request-orders-query.dto';
 import { UpdatePurchaseOrderDocDto } from './dtos/update-purchase-order-doc.dto';
 import { DirectBuyRequestDto } from './dtos/direct-buy-request.dto';
@@ -169,6 +171,27 @@ export class BuyRequestsController {
     @CurrentUser() currentUser: User,
   ) {
     return this.buyRequestsService.updateTracking(dto, currentUser);
+  }
+
+  // 🔹 Live shipping-cost preview (no order created, no auth-scoped ownership check)
+  @ApiOperation({
+    summary: 'Preview the AgroTrack shipping cost for a pickup/delivery pair',
+    description:
+      'Computed locally (not a round trip to AgroTrack) for a fast live preview while filling out the arrange-transit form. Preview only — the authoritative price is set by AgroTrack when the shipment is actually created.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cost estimate calculated',
+    type: BuyRequestEstimateShippingCostResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Pickup or delivery address could not be resolved',
+  })
+  @Post('estimate-shipping-cost')
+  @HttpCode(HttpStatus.OK)
+  async estimateShippingCost(@Body() dto: EstimateShippingCostDto) {
+    return this.buyRequestsService.estimateShippingCost(dto);
   }
 
   // 🔹 One-click arrange transit via AgroTrack (farmer only, their own request)
