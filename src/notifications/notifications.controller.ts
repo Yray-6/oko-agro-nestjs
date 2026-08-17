@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
@@ -34,16 +34,15 @@ export class NotificationsController {
         return this.notificationsService.getNotifications(user, query);
     }
 
-    @Put(':id')
-    @ApiOperation({ summary: 'Get notification by ID',  description: 'Retrieve a notification by ID. Notification must belong to the authenticated user.' })
-    @ApiParam({ name: 'id', description: 'Notification ID', example: 'uuid' })
+    @Put('read-all')
+    @ApiOperation({ summary: 'Mark all notification as read',  description: 'Marks all unread notifications for the authenticated user as read' })
     @ApiResponse({
-        status: 200, description: 'Notification retrieved successfully',
-        type: GetNotificationResponseDto
+        status: 200, description: 'All notifications marked as read',
+        type: MarkAllAsReadResponseDto
     })
     @HttpCode(HttpStatus.OK)
-    async getNotificationById( @Param('id') notificationId: string, @CurrentUser() user: User) {
-        return this.notificationsService.getNotificationById(notificationId, user);
+    async markAllAsRead( @CurrentUser() user: User) {
+        return this.notificationsService.markAllAsRead(user);
     }
 
     @Put('read/:id')
@@ -54,19 +53,20 @@ export class NotificationsController {
         type: MarkAsReadResponseDto
     })
     @HttpCode(HttpStatus.OK)
-    async markAsRead( @Param('id') notificationId: string, @CurrentUser() user: User) {
+    async markAsRead( @Param('id', ParseUUIDPipe) notificationId: string, @CurrentUser() user: User) {
         return this.notificationsService.markAsRead(notificationId, user);
     }
 
-    @Put('read-all')
-    @ApiOperation({ summary: 'Mark all notification as read',  description: 'Marks all unread notifications for the authenticated user as read' })
+    @Get(':id')
+    @ApiOperation({ summary: 'Get notification by ID',  description: 'Retrieve a notification by ID. Notification must belong to the authenticated user.' })
+    @ApiParam({ name: 'id', description: 'Notification ID', example: 'uuid' })
     @ApiResponse({
-        status: 200, description: 'All notifications marked as read',
-        type: MarkAllAsReadResponseDto
+        status: 200, description: 'Notification retrieved successfully',
+        type: GetNotificationResponseDto
     })
     @HttpCode(HttpStatus.OK)
-    async markAllAsRead( @CurrentUser() user: User) {
-        return this.notificationsService.markAllAsRead(user);
+    async getNotificationById( @Param('id', ParseUUIDPipe) notificationId: string, @CurrentUser() user: User) {
+        return this.notificationsService.getNotificationById(notificationId, user);
     }
 
     @Post('contact-seller')
