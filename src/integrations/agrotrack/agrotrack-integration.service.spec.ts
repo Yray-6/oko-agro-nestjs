@@ -95,12 +95,24 @@ describe('AgroTrackIntegrationService', () => {
     it('signs the payload and sends the exact rawBody, not a re-serialized object', async () => {
       mockFetchOnce(201, {
         success: true,
-        data: { tracking_number: 'AGT30349900', id: 42 },
+        data: {
+          tracking_number: 'AGT30349900',
+          id: 42,
+          base_rate: '15000.00',
+          distance_surcharge: '4500.00',
+          total_cost: '19500.00',
+        },
       });
 
       const result = await service.createOrder({ oko_request_id: 'abc' });
 
-      expect(result).toEqual({ trackingNumber: 'AGT30349900', orderId: 42 });
+      expect(result).toEqual({
+        trackingNumber: 'AGT30349900',
+        orderId: 42,
+        baseRate: '15000.00',
+        distanceSurcharge: '4500.00',
+        totalCost: '19500.00',
+      });
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
       expect(url).toBe(
         'https://agrotrack-production.up.railway.app/api/v1/integrations/oko/orders/',

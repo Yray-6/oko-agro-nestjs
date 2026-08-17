@@ -19,6 +19,15 @@ export class AgroTrackCancellationRejectedError extends Error {}
 export interface AgroTrackOrderResult {
   trackingNumber: string;
   orderId: number;
+  /**
+   * Kept as strings, not numbers — these are Postgres numeric/decimal values
+   * on both sides (Django's DecimalField serializes as a string, BuyRequest's
+   * matching columns are typed decimal/string too, same as paymentAmount).
+   * Converting to a JS number risks float-precision drift on money.
+   */
+  baseRate: string;
+  distanceSurcharge: string;
+  totalCost: string;
 }
 
 export interface AgroTrackEstimate {
@@ -122,9 +131,13 @@ export class AgroTrackIntegrationService {
       },
     );
 
-    const body = await readEnvelope<{ tracking_number: string; id: number }>(
-      response,
-    );
+    const body = await readEnvelope<{
+      tracking_number: string;
+      id: number;
+      base_rate: string;
+      distance_surcharge: string;
+      total_cost: string;
+    }>(response);
 
     if (response.status === 409) {
       throw new AgroTrackSenderUnresolvedError(
@@ -144,6 +157,9 @@ export class AgroTrackIntegrationService {
     return {
       trackingNumber: body.data.tracking_number,
       orderId: body.data.id,
+      baseRate: body.data.base_rate,
+      distanceSurcharge: body.data.distance_surcharge,
+      totalCost: body.data.total_cost,
     };
   }
 

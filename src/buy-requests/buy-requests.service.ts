@@ -755,6 +755,9 @@ export class BuyRequestsService {
 
       buyRequest.agroTrackTrackingNumber = result.trackingNumber;
       buyRequest.agroTrackOrderId = result.orderId;
+      buyRequest.agroTrackBaseRate = result.baseRate;
+      buyRequest.agroTrackDistanceSurcharge = result.distanceSurcharge;
+      buyRequest.agroTrackTotalCost = result.totalCost;
       const updated = await this.buyRequestsRepository.save(buyRequest);
 
       return {

@@ -177,6 +177,22 @@ export class BuyRequest {
   @Column({ type: 'timestamptz', nullable: true })
   agroTrackSyncedAt: Date | null;
 
+  /**
+   * Shipping cost quote AgroTrack computed server-side at order creation
+   * (see oko_integration.views.OkoOrderCreateView on the Django side — it
+   * never trusts a client-supplied price). Stored here so the frontend can
+   * show it immediately in the arrange-transit response, instead of it
+   * only existing on AgroTrack's own order record.
+   */
+  @Column({ type: 'decimal', precision: 30, scale: 2, nullable: true })
+  agroTrackBaseRate: string | null;
+
+  @Column({ type: 'decimal', precision: 30, scale: 2, nullable: true })
+  agroTrackDistanceSurcharge: string | null;
+
+  @Column({ type: 'decimal', precision: 30, scale: 2, nullable: true })
+  agroTrackTotalCost: string | null;
+
   @Column({ type: 'boolean', default: false })
   isDeleted: boolean;
 

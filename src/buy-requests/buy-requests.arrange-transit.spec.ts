@@ -41,9 +41,13 @@ describe('BuyRequestsService.arrangeTransitViaAgroTrack', () => {
       save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
     };
     const agroTrackIntegration = {
-      createOrder: jest
-        .fn()
-        .mockResolvedValue({ trackingNumber: 'AGT30349900', orderId: 42 }),
+      createOrder: jest.fn().mockResolvedValue({
+        trackingNumber: 'AGT30349900',
+        orderId: 42,
+        baseRate: '15000.00',
+        distanceSurcharge: '4500.00',
+        totalCost: '19500.00',
+      }),
       ...agroTrackOverrides,
     };
     const service = new BuyRequestsService(
@@ -97,6 +101,21 @@ describe('BuyRequestsService.arrangeTransitViaAgroTrack', () => {
     );
     expect(result.data.agroTrackTrackingNumber).toBe('AGT30349900');
     expect(result.requiresManualFallback).toBeUndefined();
+  });
+
+  it('stores the AgroTrack-computed price so the frontend gets it immediately, not just the tracking number', async () => {
+    const buyRequest = {
+      id: 'br-1', requestNumber: 1042, seller: farmer, buyer: processor, agroTrackTrackingNumber: null,
+    };
+    const { service, buyRequestsRepository } = buildService(buyRequest);
+
+    const result = await service.arrangeTransitViaAgroTrack('br-1', dto, farmer as any);
+
+    const saved = buyRequestsRepository.save.mock.calls[0][0];
+    expect(saved.agroTrackBaseRate).toBe('15000.00');
+    expect(saved.agroTrackDistanceSurcharge).toBe('4500.00');
+    expect(saved.agroTrackTotalCost).toBe('19500.00');
+    expect(result.data.agroTrackTotalCost).toBe('19500.00');
   });
 
   it('never touches orderState or paymentConfirmed', async () => {
