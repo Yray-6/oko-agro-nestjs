@@ -24,6 +24,7 @@ import { RatingsModule } from './ratings/ratings.module';
 import { SmsModule } from './sms/sms.module';
 import { ProductInventoriesModule } from './product-inventories/product-inventories.module';
 import { AgroTrackClientModule } from './integrations/agrotrack/agrotrack-client.module';
+import { LocationsModule } from './locations/locations.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { AgroTrackClientModule } from './integrations/agrotrack/agrotrack-client
     UsersModule,
     AuthModule,
     CropsModule,
+    LocationsModule,
     FilesModule,
     MailerModule,
     CertificationsModule,
