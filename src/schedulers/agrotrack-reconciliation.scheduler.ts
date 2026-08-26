@@ -70,6 +70,8 @@ export class AgroTrackReconciliationScheduler {
 
         buyRequest.agroTrackStatus = remoteStatus.status as AgroTrackStatus;
         buyRequest.agroTrackOrderId = remoteStatus.id;
+        buyRequest.agroTrackEstimatedDeliveryDate =
+          remoteStatus.estimatedDeliveryDate;
         buyRequest.agroTrackSyncedAt = new Date();
         await this.buyRequestsRepository.save(buyRequest);
       } catch (error) {

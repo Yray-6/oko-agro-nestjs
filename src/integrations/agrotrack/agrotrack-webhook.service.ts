@@ -49,12 +49,16 @@ export class AgroTrackWebhookService {
             `event occurred_at ${dto.occurred_at} is older than the last synced status`,
         );
       } else {
-        // Deliberately limited to these four fields — never orderState or
+        // Deliberately limited to these fields — never orderState or
         // paymentConfirmed. Logistics status must never drive payment state.
         buyRequest.agroTrackStatus = dto.status as AgroTrackStatus;
         buyRequest.agroTrackOrderId = dto.order_id;
         buyRequest.agroTrackTrackingNumber = dto.tracking_number;
         buyRequest.agroTrackSyncedAt = occurredAt;
+        if (dto.estimated_delivery_date !== undefined) {
+          buyRequest.agroTrackEstimatedDeliveryDate =
+            dto.estimated_delivery_date;
+        }
         await this.buyRequestsRepository.save(buyRequest);
       }
     }

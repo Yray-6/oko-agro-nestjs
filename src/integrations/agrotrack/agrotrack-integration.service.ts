@@ -44,6 +44,7 @@ export interface AgroTrackOrderStatus {
   trackingNumber: string;
   status: string;
   updatedAt: string;
+  estimatedDeliveryDate: string | null;
 }
 
 export interface AgroTrackSsoHandoff {
@@ -191,6 +192,7 @@ export class AgroTrackIntegrationService {
       tracking_number: string;
       status: string;
       updated_at: string;
+      estimated_delivery_date: string | null;
     }>(response);
     if (!response.ok || !body.data) {
       this.logger.error(
@@ -207,6 +209,7 @@ export class AgroTrackIntegrationService {
       trackingNumber: body.data.tracking_number,
       status: body.data.status,
       updatedAt: body.data.updated_at,
+      estimatedDeliveryDate: body.data.estimated_delivery_date ?? null,
     };
   }
 

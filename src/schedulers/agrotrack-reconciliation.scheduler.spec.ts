@@ -30,6 +30,7 @@ describe('AgroTrackReconciliationScheduler', () => {
           trackingNumber: 'AGT1',
           status: 'in_transit',
           updatedAt: '2026-08-14T09:00:00Z',
+          estimatedDeliveryDate: '2026-09-20',
         }),
     };
     const scheduler = new AgroTrackReconciliationScheduler(
@@ -54,7 +55,7 @@ describe('AgroTrackReconciliationScheduler', () => {
     expect(buyRequestsRepository.createQueryBuilder).not.toHaveBeenCalled();
   });
 
-  it('pulls status for each stale request and updates agroTrackStatus/agroTrackOrderId/agroTrackSyncedAt', async () => {
+  it('pulls status for each stale request and updates agroTrackStatus/agroTrackOrderId/agroTrackEstimatedDeliveryDate/agroTrackSyncedAt', async () => {
     const { scheduler, buyRequestsRepository, agroTrackIntegration } =
       buildScheduler([staleRequest]);
 
@@ -64,6 +65,7 @@ describe('AgroTrackReconciliationScheduler', () => {
     const saved = buyRequestsRepository.save.mock.calls[0][0];
     expect(saved.agroTrackStatus).toBe('in_transit');
     expect(saved.agroTrackOrderId).toBe(42);
+    expect(saved.agroTrackEstimatedDeliveryDate).toBe('2026-09-20');
     expect(saved.agroTrackSyncedAt).toBeInstanceOf(Date);
   });
 

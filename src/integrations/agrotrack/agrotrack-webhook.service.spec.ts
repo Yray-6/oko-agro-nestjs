@@ -89,4 +89,48 @@ describe('AgroTrackWebhookService', () => {
     expect(eventsRepository.save).toHaveBeenCalled();
     expect(result.statusCode).toBe(200);
   });
+
+  it('applies estimated_delivery_date when the payload carries one', async () => {
+    const buyRequest = { id: 'br-1', agroTrackSyncedAt: null };
+    const { service, buyRequestsRepository } = buildService(buyRequest);
+
+    await service.handleStatusChanged({
+      ...basePayload,
+      estimated_delivery_date: '2026-09-15',
+    });
+
+    const saved = buyRequestsRepository.save.mock.calls[0][0];
+    expect(saved.agroTrackEstimatedDeliveryDate).toBe('2026-09-15');
+  });
+
+  it('clears agroTrackEstimatedDeliveryDate when the payload explicitly carries null', async () => {
+    const buyRequest = {
+      id: 'br-1',
+      agroTrackSyncedAt: null,
+      agroTrackEstimatedDeliveryDate: '2026-09-01',
+    };
+    const { service, buyRequestsRepository } = buildService(buyRequest);
+
+    await service.handleStatusChanged({
+      ...basePayload,
+      estimated_delivery_date: null,
+    });
+
+    const saved = buyRequestsRepository.save.mock.calls[0][0];
+    expect(saved.agroTrackEstimatedDeliveryDate).toBeNull();
+  });
+
+  it('leaves agroTrackEstimatedDeliveryDate untouched when the payload omits the field entirely', async () => {
+    const buyRequest = {
+      id: 'br-1',
+      agroTrackSyncedAt: null,
+      agroTrackEstimatedDeliveryDate: '2026-09-01',
+    };
+    const { service, buyRequestsRepository } = buildService(buyRequest);
+
+    await service.handleStatusChanged(basePayload); // no estimated_delivery_date key at all
+
+    const saved = buyRequestsRepository.save.mock.calls[0][0];
+    expect(saved.agroTrackEstimatedDeliveryDate).toBe('2026-09-01');
+  });
 });

@@ -34,6 +34,7 @@ together by one id — a buy request's own `id`, sent to AgroTrack as
 | 5 | Cancellation | `cancelOrder()`, `cancelAgroTrackShipment()`, `PUT :id/cancel-transit` |
 | 6 | SSO handoff (optional) | `issueSsoHandoffToken()`, `GET integrations/agrotrack/sso-handoff-token` |
 | 7 | Local shipping-cost preview | `pricing/` — geocode/OSRM/formula replicated locally, `POST buy-requests/estimate-shipping-cost` |
+| 8 | ETA sync | `agroTrackEstimatedDeliveryDate` on `BuyRequest`, kept current via webhook + reconciliation |
 
 All of it lives under `src/integrations/agrotrack/` plus a handful of
 additive methods on `BuyRequestsService`/`BuyRequestsController`. Nothing
@@ -87,7 +88,11 @@ numbers, matching the existing `paymentAmount` convention — Postgres
 decimals lose precision if round-tripped through a JS `number`). Before
 these existed, a successful arrange-transit call returned pricing that had
 already been computed but was silently discarded before reaching the
-frontend.
+frontend. Also `agroTrackEstimatedDeliveryDate` (`date`, nullable string) —
+AgroTrack's own dispatcher-set delivery estimate, kept via webhook/
+reconciliation (§4.10) and deliberately separate from this app's own
+`estimatedDeliveryDate` (the buyer's commercial target, set at buy-request
+creation) — same reasoning as `agroTrackStatus` vs `orderState`.
 
 ### New env vars
 
@@ -199,8 +204,9 @@ guard passes:
 3. **Out-of-order protection:** if the event's `occurred_at` is older than
    the `agroTrackSyncedAt` already recorded, skip the update (but still
    record the event as processed).
-4. Otherwise, updates exactly four fields: `agroTrackStatus`,
-   `agroTrackOrderId`, `agroTrackTrackingNumber`, `agroTrackSyncedAt`.
+4. Otherwise, updates `agroTrackStatus`, `agroTrackOrderId`,
+   `agroTrackTrackingNumber`, `agroTrackSyncedAt`, and (if the payload
+   carries the key at all — see §4.10) `agroTrackEstimatedDeliveryDate`.
    **Never** `orderState`, **never** `paymentConfirmed` — this is the one
    rule the whole integration is built around. AgroTrack's `in_transit`
    and this app's `in_transit` are not the same event; this app's
@@ -282,6 +288,31 @@ itself computes and returns at order-creation time (§4.3 step 6) — a stale
 pricing-config cache here can only ever make the *preview* slightly off,
 never change what's actually billed.
 
+### 4.10 Keeping `agroTrackEstimatedDeliveryDate` current (Package 8)
+
+AgroTrack's own `estimated_delivery_date` (set manually by a dispatcher —
+there's no auto-computed ETA on either side of this integration) wasn't
+reaching this app at all before Package 8: AgroTrack's webhook only fired
+on status changes and never included the field even when it did fire. Both
+gaps are now closed on AgroTrack's side (`OKO_INTEGRATION.md` §4.10) —
+setting the ETA alone now enqueues its own webhook (`event:
+'order.eta_updated'`), and every webhook payload carries the current
+value regardless of what triggered it.
+
+On this side, `WebhookOrderStatusChangedDto` gained an optional
+`estimated_delivery_date` field, and `agrotrack-webhook.service.ts`
+applies it to `agroTrackEstimatedDeliveryDate` — but only when the key is
+present at all (`!== undefined`, not just falsy) so an older/replayed
+payload that omits the field entirely doesn't wipe out a value this app
+already has; an explicit `null` in the payload *does* clear it, since that
+means AgroTrack itself has no ETA set right now. Still governed by the
+same out-of-order/staleness guard as every other field in this handler
+(§4.5 step 3).
+
+The reconciliation pull side (`getOrderStatus()`, §4.4) and its scheduler
+(§4.6) carry the same field now too, so a reconciliation sweep restores
+ETA along with status if the webhook mechanism was ever down.
+
 ---
 
 ## 5. Testing
@@ -294,7 +325,7 @@ npx jest integrations/agrotrack buy-requests.arrange-transit buy-requests.cancel
 npx nest build
 ```
 
-78 tests across 12 suites, all passing, build clean.
+82 tests across 12 suites, all passing, build clean.
 
 One thing worth knowing if you run the *full* suite (`npx jest`): ~30
 pre-existing spec files elsewhere in this repo fail — that predates this
@@ -350,6 +381,7 @@ import error, which is what surfaced them as failing for their own
   response — previously computed by AgroTrack but discarded before
   reaching the frontend. See the note under "New entity fields" in §3.
 - **Added:** Package 7, local shipping-cost preview — see §4.9.
+- **Added:** Package 8, ETA sync — see §4.10.
 - **Merged:** a teammate's `LocationsModule` (`src/locations/*`, Nigerian
   states/LGAs for location pickers) landed on `main` around the same time
   as this integration. It's independent of everything here, but worth a

@@ -178,6 +178,17 @@ export class BuyRequest {
   agroTrackSyncedAt: Date | null;
 
   /**
+   * AgroTrack's own delivery estimate, set by a dispatcher on their side and
+   * pushed here via webhook/reconciliation. Deliberately separate from this
+   * app's own estimatedDeliveryDate (the buyer's commercial target, entered
+   * when the buy request was created) — same reasoning as agroTrackStatus
+   * vs orderState: two different systems' idea of "when," never merged.
+   * Date-only (no time/tz component), matching AgroTrack's own DateField.
+   */
+  @Column({ type: 'date', nullable: true })
+  agroTrackEstimatedDeliveryDate: string | null;
+
+  /**
    * Shipping cost quote AgroTrack computed server-side at order creation
    * (see oko_integration.views.OkoOrderCreateView on the Django side — it
    * never trusts a client-supplied price). Stored here so the frontend can

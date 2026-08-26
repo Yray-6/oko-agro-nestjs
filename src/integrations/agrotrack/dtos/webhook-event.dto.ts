@@ -47,4 +47,13 @@ export class WebhookOrderStatusChangedDto {
   @IsOptional()
   @IsString()
   current_location?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-09-15',
+    description:
+      "AgroTrack's current delivery estimate for this shipment (date-only), or omitted/null if unset.",
+  })
+  @IsOptional()
+  @IsDateString()
+  estimated_delivery_date?: string | null;
 }

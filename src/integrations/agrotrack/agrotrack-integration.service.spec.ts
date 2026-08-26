@@ -148,6 +148,7 @@ describe('AgroTrackIntegrationService', () => {
           tracking_number: 'AGT30349900',
           status: 'in_transit',
           updated_at: '2026-08-14T09:12:00Z',
+          estimated_delivery_date: '2026-09-15',
         },
       });
 
@@ -159,12 +160,30 @@ describe('AgroTrackIntegrationService', () => {
         trackingNumber: 'AGT30349900',
         status: 'in_transit',
         updatedAt: '2026-08-14T09:12:00Z',
+        estimatedDeliveryDate: '2026-09-15',
       });
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
       expect(url).toBe(
         'https://agrotrack-production.up.railway.app/api/v1/integrations/oko/orders/req-1/',
       );
       expect(init.method).toBe('GET');
+    });
+
+    it('defaults estimatedDeliveryDate to null when AgroTrack omits it', async () => {
+      mockFetchOnce(200, {
+        success: true,
+        data: {
+          id: 42,
+          tracking_number: 'AGT30349900',
+          status: 'in_transit',
+          updated_at: '2026-08-14T09:12:00Z',
+          estimated_delivery_date: null,
+        },
+      });
+
+      const result = await service.getOrderStatus('req-1');
+
+      expect(result?.estimatedDeliveryDate).toBeNull();
     });
 
     it('returns null on 404 instead of throwing — no order yet is an expected outcome', async () => {
