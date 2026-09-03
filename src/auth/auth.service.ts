@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { handleServiceError } from 'src/common/utils/error-handler.util';
 import { detectMimeTypeFromBase64, isValidBase64SizeGeneric, SUPPORTED_MIME_TYPES } from 'src/common/utils/base64.util';
+import { normalizeEmail } from 'src/common/utils/email.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User, UserRole } from '../users/entities/user.entity';
 import { instanceToPlain } from 'class-transformer';
@@ -170,6 +171,7 @@ export class AuthService {
                 userPhoto, farmPhoto, businessRegCertDoc, taxIdCertDoc,
                 ...userData
             } = registerUserDto;
+            const normalizedEmail = normalizeEmail(email);
 
             // VALIDATIONS
             if (registerUserDto.password !== registerUserDto.confirmPassword)
@@ -202,7 +204,7 @@ export class AuthService {
 
             // CHECK IF USER EXISTS
             const existingUser = await this.usersRepository.findOne({
-                where: { email: ILike(registerUserDto.email) },
+                where: { email: ILike(normalizedEmail) },
                 relations: ['files'],
             });
 
@@ -242,7 +244,7 @@ export class AuthService {
                 // First-time registration
                 user = this.usersRepository.create({
                     ...userData,
-                    email: email.trim().toLowerCase(),
+                    email: normalizedEmail,
                     password: hashedPassword,
                     crops,
                     certifications,
@@ -254,6 +256,7 @@ export class AuthService {
                 // User exists but not verified → update instead
                 user = Object.assign(existingUser, {
                     ...userData,
+                    email: normalizedEmail,
                     password: hashedPassword,
                     crops,
                     certifications,
@@ -313,8 +316,9 @@ export class AuthService {
     }
 
     async loginUser(loginUserDto: LoginUserDto) {
+        const normalizedEmail = normalizeEmail(loginUserDto.email);
         const existingUser = await this.usersRepository.findOne({ 
-            where: { email: ILike(loginUserDto.email) },
+            where: { email: ILike(normalizedEmail) },
             relations: ['crops','files','certifications','qualityStandards'],
         })
 
@@ -395,8 +399,8 @@ export class AuthService {
 
     
     async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
-        const email = forgotPasswordDto.email.toLowerCase().trim();
-        const user = await this.usersRepository.findOne({ where: { email } });
+        const email = normalizeEmail(forgotPasswordDto.email);
+        const user = await this.usersRepository.findOne({ where: { email: ILike(email) } });
 
         if (!user) throw new NotFoundException('User with email not found');
 

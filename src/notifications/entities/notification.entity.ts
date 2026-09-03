@@ -1,5 +1,6 @@
 import { User } from "src/users/entities/user.entity";
-import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Product } from "src/products/entities/product.entity";
+import { Column, CreateDateColumn, Entity, Index, ManyToOne, JoinColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 
 
 export enum NotificationType {
@@ -90,6 +91,14 @@ export class Notification {
 
   @Column({ type: 'varchar', nullable: true })
   externalMessageId: string | null; // Twilio SID
+
+  /** Selected product from the farmer's contact offer (nullable) */
+  @ManyToOne(() => Product, { nullable: true, eager: false, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'productId' })
+  product: Product | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  productId: string | null;
 
   @Column({ default: false })
   isDeleted: boolean;

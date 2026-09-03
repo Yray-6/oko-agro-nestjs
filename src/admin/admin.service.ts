@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { InjectRepository } from '@nestjs/typeorm';
 import { BuyRequest, OrderState } from 'src/buy-requests/entities/buy-request.entity';
 import { handleServiceError } from 'src/common/utils/error-handler.util';
+import { normalizeEmail } from 'src/common/utils/email.util';
 import { Product, ProductApprovalStatus } from 'src/products/entities/product.entity';
 import { User, UserRole } from 'src/users/entities/user.entity';
 import { ILike, In, Not, Repository } from 'typeorm';
@@ -191,9 +192,11 @@ export class AdminService {
 
     async createAdmin(dto: CreateAdminUserDto) {
         try {
+            const normalizedEmail = normalizeEmail(dto.email);
+
             // Check existing user
             const existing = await this.usersRepository.findOne({
-                where: { email: ILike(dto.email) },
+                where: { email: ILike(normalizedEmail) },
             });
 
             if (existing) {
@@ -204,6 +207,7 @@ export class AdminService {
 
             const newUser = this.usersRepository.create({
                 ...dto,
+                email: normalizedEmail,
                 password: hashedPassword,
                 role: UserRole.ADMIN,
                 userVerified: true,     // admin does NOT need OTP verification

@@ -8,7 +8,9 @@ import { GetNotificationsQueryDto } from './dtos/get-notifications-query.dto';
 import { handleServiceError } from 'src/common/utils/error-handler.util';
 import { ContactBuyerDto } from './dtos/contact-buyer.dto';
 import { BuyRequest } from 'src/buy-requests/entities/buy-request.entity';
+import { Product, ProductApprovalStatus } from 'src/products/entities/product.entity';
 import { instanceToPlain } from 'class-transformer';
+import Decimal from 'decimal.js';
 
 @Injectable()
 export class NotificationsService {
@@ -16,7 +18,8 @@ export class NotificationsService {
     
     constructor(
         @InjectRepository(Notification) private readonly notificationsRepository: Repository<Notification>,
-        @InjectRepository(BuyRequest) private readonly buyRequestsRepository: Repository<BuyRequest>
+        @InjectRepository(BuyRequest) private readonly buyRequestsRepository: Repository<BuyRequest>,
+        @InjectRepository(Product) private readonly productsRepository: Repository<Product>,
     ) {}
 
     async createNotification( payload: CreateNotificationPayload): Promise<Notification> {
@@ -77,8 +80,11 @@ export class NotificationsService {
                 'notification.type',
                 'notification.title',
                 'notification.message',
+                'notification.relatedEntityType',
+                'notification.relatedEntityId',
                 'notification.senderId',
                 'notification.senderName',
+                'notification.productId',
                 'notification.isRead',
                 'notification.createdAt',
                 'notification.updatedAt',
@@ -134,8 +140,11 @@ export class NotificationsService {
                     type: true,
                     title: true,
                     message: true,
+                    relatedEntityType: true,
+                    relatedEntityId: true,
                     senderId: true,
                     senderName: true,
+                    productId: true,
                     isRead: true,
                     createdAt: true,
                     updatedAt: true,
@@ -252,6 +261,33 @@ export class NotificationsService {
                 throw new ForbiddenException('This buy request does not belong to the specified processor' );
             }
 
+            // Validate selected product if provided
+            let validatedProductId: string | null = null;
+            if (dto.productId) {
+                const product = await this.productsRepository.findOne({
+                    where: { id: dto.productId, isDeleted: false },
+                    relations: ['owner', 'cropType'],
+                });
+
+                if (!product) {
+                    throw new NotFoundException('Selected product not found');
+                }
+                if (product.owner?.id !== farmer.id) {
+                    throw new ForbiddenException('Selected product does not belong to you');
+                }
+                if (product.approvalStatus !== ProductApprovalStatus.APPROVED) {
+                    throw new BadRequestException('Selected product is not approved');
+                }
+                const available = new Decimal(product.quantityKg).minus(product.reservedQuantityKg);
+                if (available.lte(0)) {
+                    throw new BadRequestException('Selected product has no available inventory');
+                }
+                if (buyRequest.cropType && product.cropType && product.cropType.id !== buyRequest.cropType.id) {
+                    throw new BadRequestException('Selected product crop does not match the buy request crop');
+                }
+                validatedProductId = product.id;
+            }
+
             const processor = buyRequest.buyer;
 
             const farmerName = `${farmer.firstName.toLowerCase()} ${farmer.lastName.toLowerCase()}`;
@@ -274,6 +310,17 @@ export class NotificationsService {
                 relatedEntityId: buyRequest.id,
             });
 
+            // Persist productId on the notification row
+            if (validatedProductId) {
+                notification.productId = validatedProductId;
+                await this.notificationsRepository.save(notification);
+            }
+
+            // Derive cropId from the product for the response
+            const cropId = validatedProductId
+                ? (await this.productsRepository.findOne({ where: { id: validatedProductId }, relations: ['cropType'] }))?.cropType?.id ?? null
+                : null;
+
             return {
                 statusCode: 201,
                 message: 'Contact message sent successfully',
@@ -287,6 +334,8 @@ export class NotificationsService {
                     recipientId: processor.id,
                     relatedEntityType: notification.relatedEntityType,
                     relatedEntityId: notification.relatedEntityId,
+                    productId: validatedProductId,
+                    cropId,
                     isRead: notification.isRead,
                     createdAt: notification.createdAt,
                 },

@@ -14,4 +14,9 @@ export class ContactBuyerDto {
     @IsOptional()
     @IsString()
     message?: string;
+
+    @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', required: false, description: 'Selected farmer product/listing ID' })
+    @IsOptional()
+    @IsUUID()
+    productId?: string;
 }
